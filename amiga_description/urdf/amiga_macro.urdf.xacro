@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="https://ros.org/wiki/xacro" name="amiga">
+
+<xacro:macro name="amiga_macro" params="amiga_prefix:='amiga__' amiga_parent:='world' mesh_base_path">
+  <!-- ================== -->
+  <!--     Amiga Macro    -->
+  <!-- ================== -->
+  <xacro:include filename="./amiga_body.urdf.xacro" />
+  <xacro:include filename="./amiga_wheel.urdf.xacro" />
+   
+  <!-- ================== -->
+  <!--       Links        -->
+  <!-- ================== -->
+  <link name="${amiga_prefix}base"/>  
+  
+  <xacro:amiga_body
+    prefix="${amiga_prefix}"
+    amiga_parent="${amiga_prefix}base"
+  />
+    <xacro:wheel
+        prefix="${amiga_prefix}"
+        wheel_name="left_wheel_front"
+        parent_link="base"
+        joint_origin_xyz="0.4 0.25 0.05"
+        joint_origin_rpy="0 0 0"
+        joint_axis_xyz="0 1 0"
+    />
+
+    <xacro:wheel
+        prefix="${amiga_prefix}"
+        wheel_name="right_wheel_front"
+        parent_link="base"
+        joint_origin_xyz="0.4 -0.25 0.05"
+        joint_origin_rpy="0 0 0"
+        joint_axis_xyz="0 1 0"
+    />
+
+    <xacro:wheel
+        prefix="${amiga_prefix}"
+        wheel_name="left_wheel_rear"
+        parent_link="base"
+        joint_origin_xyz="-0.4 0.25 0.05"
+        joint_origin_rpy="0 0 0"
+        joint_axis_xyz="0 1 0"
+    />
+
+    <xacro:wheel
+        prefix="${amiga_prefix}"
+        wheel_name="right_wheel_rear"
+        parent_link="base"
+        joint_origin_xyz="-0.4 -0.25 0.05"
+        joint_origin_rpy="0 0 0"
+        joint_axis_xyz="0 1 0"
+    />
+
+    
+
+
+</xacro:macro>
+
+</robot>
