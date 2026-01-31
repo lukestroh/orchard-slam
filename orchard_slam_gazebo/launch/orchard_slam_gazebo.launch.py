@@ -75,7 +75,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
 def generate_launch_description():
     declared_configs = [
         dict(name="launch_gui", default_value="true", choices=["true", "false"]),
-        dict(name="world_sdf_file", default_value="small_orchard.sdf", choices=["room.sdf","large_orchard.sdf", "small_orchard.sdf"]),
+        dict(name="world_sdf_file", default_value="small_orchard", choices=["room","large_orchard", "small_orchard"]),
 
     ]
 

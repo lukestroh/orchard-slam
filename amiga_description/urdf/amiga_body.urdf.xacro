@@ -25,7 +25,7 @@
       <visual>
         <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
         <geometry>
-          <mesh filename="file://$(find amiga_description)/meshes/farm-ng/amiga/frame_on_amiga_v2_simplified.stl"/>
+          <mesh filename="file://$(find amiga_description)/meshes/frame_on_amiga_v2_simplified.stl"/>
         </geometry>
         <material name="LightLightGrey"/>
       </visual>
