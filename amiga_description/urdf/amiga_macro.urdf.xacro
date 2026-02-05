@@ -1,0 +1,80 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="https://ros.org/wiki/xacro" name="amiga">
+
+<xacro:macro name="amiga_macro" params="amiga_prefix:='amiga_' amiga_parent:='world' mesh_base_path">
+  <!-- ================== -->
+  <!--     Amiga Macro    -->
+  <!-- ================== -->
+  <xacro:include filename="./amiga_body.urdf.xacro" />
+  <xacro:include filename="./amiga_wheel.urdf.xacro" />
+  <xacro:include filename="./amiga_ros2_control.urdf.xacro" />
+
+   
+  <!-- ================== -->
+  <!--       Links        -->
+  <!-- ================== -->
+  <link name="${amiga_prefix}base"/>  
+  
+  <xacro:amiga_body
+    prefix="${amiga_prefix}"
+    amiga_parent="${amiga_prefix}base"
+  />
+    <xacro:wheel
+        prefix="${amiga_prefix}"
+        wheel_name="left_wheel_front"
+        parent_link="${amiga_prefix}base"
+        joint_origin_xyz="0.344 0.5 0.22"
+        joint_origin_rpy="0 0 0"
+        joint_axis_xyz="0 1 0"
+        wheel_radius="0.25"
+        wheel_width="0.10"
+        wheel_mass="1.0"
+    />
+
+    <xacro:wheel
+        prefix="${amiga_prefix}"
+        wheel_name="right_wheel_front"
+        parent_link="${amiga_prefix}base"
+        joint_origin_xyz="0.344 -0.5 0.22"
+        joint_origin_rpy="0 0 0"
+        joint_axis_xyz="0 1 0"
+        wheel_radius="0.25"
+        wheel_width="0.10"
+        wheel_mass="1.0"
+    />
+
+    <xacro:wheel
+        prefix="${amiga_prefix}"
+        wheel_name="left_wheel_rear"
+        parent_link="${amiga_prefix}base"
+        joint_origin_xyz="-0.344 0.5 0.22"
+        joint_origin_rpy="0 0 0"
+        joint_axis_xyz="0 1 0"
+        wheel_radius="0.25"
+        wheel_width="0.10"
+        wheel_mass="1.0"
+    />
+
+    <xacro:wheel
+        prefix="${amiga_prefix}"
+        wheel_name="right_wheel_rear"
+        parent_link="${amiga_prefix}base"
+        joint_origin_xyz="-0.344 -0.5 0.22"
+        joint_origin_rpy="0 0 0"
+        joint_axis_xyz="0 1 0"
+        wheel_radius="0.25"
+        wheel_width="0.10"
+        wheel_mass="1.0"
+    />
+
+    <xacro:linear_slider_ros2_control
+        name="amiga"
+        prefix="${amiga_prefix}"
+        sim_gazebo="true"
+    />
+
+
+
+</xacro:macro>
+
+</robot>

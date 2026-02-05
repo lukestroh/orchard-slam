@@ -1,0 +1,129 @@
+<?xml version="1.0" ?>
+<robot name="amiga">
+
+  <!-- World link -->
+  <!-- <link name="world"/> -->
+
+  <!-- ================== -->
+  <!--       Links        -->
+  <!-- ================== -->
+  <link name="amiga_base"/>
+
+  <material name="LightLightGrey">
+    <color rgba="0.941 0.941 0.941 1.0"/>
+  </material>
+
+  <link name="amiga_body">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://amiga_description/meshes/frame_on_amiga_v2_simplified.stl"/>
+      </geometry>
+      <material name="LightLightGrey"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0.499053035"/>
+      <geometry>
+        <box size="1.132 0.8 0.99810607"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 -0.12 0.99810607"/>
+      <geometry>
+        <box size="1.132 0.6 0.2"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0.441 0.0833333 1.19810607"/>
+      <geometry>
+        <box size="0.25 0.25 0.25"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="40.0"/>
+      <inertia ixx="5.454" ixy="0" ixz="0" iyy="7.592" iyz="0" izz="6.404"/>
+    </inertial>
+  </link>
+
+  <link name="amiga_tool0"/>
+
+  <link name="amiga_left_wheel_front"/>
+  <link name="amiga_right_wheel_front"/>
+  <link name="amiga_left_wheel_rear"/>
+  <link name="amiga_right_wheel_rear"/>
+
+  <!-- ================== -->
+  <!--       Joints       -->
+  <!-- ================== -->
+
+  <joint name="amiga_base--amiga_body" type="fixed">
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <parent link="amiga_base"/>
+      <child link="amiga_body"/>
+  </joint>
+
+  <!-- attach robot to the world (make 'world' the root) -->
+  <!-- <joint name="world__amiga_base" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <parent link="world"/>
+    <child link="amiga_base"/>
+  </joint> -->
+
+  <joint name="amiga_body--amiga_tool0" type="fixed">
+    <origin rpy="0 0 0.785398" xyz="-0.225 0.323256 1.09810607"/>
+    <parent link="amiga_body"/>
+    <child link="amiga_tool0"/>
+  </joint>
+
+  <!-- ================== -->
+  <!--       Wheel Joints -->
+  <!-- ================== -->
+
+  <!-- Front left wheel (driven) -->
+  <joint name="amiga_left_wheel_front_joint" type="continuous">
+    <origin rpy="0 0 0" xyz="0.4 0.25 0.05"/>
+    <parent link="amiga_base"/>
+    <child link="amiga_left_wheel_front"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- Front right wheel (driven) -->
+  <joint name="amiga_right_wheel_front_joint" type="continuous">
+    <origin rpy="0 0 0" xyz="0.4 -0.25 0.05"/>
+    <parent link="amiga_base"/>
+    <child link="amiga_right_wheel_front"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- Rear left wheel (mimic front left) -->
+  <joint name="amiga_left_wheel_rear_joint" type="continuous">
+    <origin rpy="0 0 0" xyz="-0.4 0.25 0.05"/>
+    <parent link="amiga_base"/>
+    <child link="amiga_left_wheel_rear"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- Rear right wheel (mimic front right) -->
+  <joint name="amiga_right_wheel_rear_joint" type="continuous">
+    <origin rpy="0 0 0" xyz="-0.4 -0.25 0.05"/>
+    <parent link="amiga_base"/>
+    <child link="amiga_right_wheel_rear"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- ================== -->
+  <!--   Diff Drive Plugin -->
+  <!-- ================== -->
+
+  <gazebo reference="amiga_body">
+    <plugin name="diff_drive" filename="libgazebo_ros_diff_drive.so">
+      <left_joint>amiga_left_wheel_front_joint</left_joint>
+      <right_joint>amiga_right_wheel_front_joint</right_joint>
+      <wheel_separation>0.5</wheel_separation>
+      <wheel_diameter>0.3</wheel_diameter>
+      <cmd_vel_topic>cmd_vel</cmd_vel_topic>
+    </plugin>
+  </gazebo>
+
+</robot>
