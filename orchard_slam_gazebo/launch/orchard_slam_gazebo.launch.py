@@ -12,24 +12,25 @@ from launch_ros.actions import Node
 import os
 
 import rclpy.logging
+
 logger = rclpy.logging.get_logger("orchard_slam_gazebo.launch")
 
-def launch_setup(context: LaunchContext, *args, **kwargs): 
+
+def launch_setup(context: LaunchContext, *args, **kwargs):
+    # Launch configurations
+    gazebo_headless = LaunchConfiguration("gazebo_headless")
+    world_sdf_file = LaunchConfiguration("world_sdf_file")
+
     # Package directories
     gz_sim_pkg_share = get_package_share_directory("ros_gz_sim")
     orchard_slam_gazebo_pkg_share = get_package_share_directory("orchard_slam_gazebo")
+    gazebo_model_path = os.path.join(orchard_slam_gazebo_pkg_share, "models")
 
-    gazebo_model_path = os.path.join(orchard_slam_gazebo_pkg_share, "models") 
     # Environmental Variables
     _set_env_var_gz_sim_resource_path = SetEnvironmentVariable(
         name="GZ_SIM_RESOURCE_PATH",
         value=orchard_slam_gazebo_pkg_share,
     )
-
-    launch_gui = LaunchConfiguration("launch_gui")
-    world_sdf_file = LaunchConfiguration("world_sdf_file")
-
-    
 
     world_abs_path = os.path.join(
         orchard_slam_gazebo_pkg_share,
@@ -61,22 +62,44 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         launch_arguments={
             "gz_args": "-g",
         }.items(),
-        condition=IfCondition(launch_gui),
+        condition=UnlessCondition(gazebo_headless),
+    )
+
+    _node_gz_bridge_clock = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
+        output="screen",
+    )
+
+    _node_spawn_robot = Node(
+        package="ros_gz_sim",
+        executable="create",
+        arguments=[
+            "-topic",
+            "robot_description",
+            "-name",
+            "amiga",
+            "-allow_renaming",
+            "true",
+        ],
+        output="screen",
     )
 
     _to_run = [
         _set_env_var_gz_sim_resource_path,
         _launch_gz_server,
-        _launch_gz_sim
+        _launch_gz_sim,
+        _node_gz_bridge_clock,
+        _node_spawn_robot,
     ]
     return _to_run
 
 
 def generate_launch_description():
     declared_configs = [
-        dict(name="launch_gui", default_value="true", choices=["true", "false"]),
-        dict(name="world_sdf_file", default_value="small_orchard", choices=["room","large_orchard", "small_orchard"]),
-
+        dict(name="gazebo_headless", default_value="false", choices=["true", "false"]),
+        dict(name="world_sdf_file", default_value="small_orchard", choices=["room", "large_orchard", "small_orchard"]),
     ]
 
     declared_args = [
