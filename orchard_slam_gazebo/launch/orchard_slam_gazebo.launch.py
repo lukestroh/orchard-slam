@@ -76,6 +76,9 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         package="ros_gz_sim",
         executable="create",
         arguments=[
+            "-r",
+            "-z",
+            "1.0",
             "-topic",
             "robot_description",
             "-name",
