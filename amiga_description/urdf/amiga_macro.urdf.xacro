@@ -14,7 +14,9 @@
   <!--       Links        -->
   <!-- ================== -->
   <link name="${amiga_prefix}base"/>  
-  
+
+<!-- The wheel y distance is larger than it should be (0.5) -->
+<!-- the real distance is 0.268 -->  
   <xacro:amiga_body
     prefix="${amiga_prefix}"
     amiga_parent="${amiga_prefix}base"
