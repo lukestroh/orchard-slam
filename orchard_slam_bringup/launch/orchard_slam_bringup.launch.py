@@ -81,18 +81,23 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
             "/controller_manager",
         ],
     )
-
-    # Delay spawning controllers to allow Gazebo's controller_manager to start
-    _delayed_spawner = TimerAction(
-        period=5.0,
-        actions=[_node_joint_state_broadcaster_spawner],
+    _node_diff_drive_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "diff_drive_controller",
+            "--controller-manager",
+            "/controller_manager",
+        ],
     )
+
 
     _to_run = [
         _launch_amiga_description,
         _launch_gazebo,
-        # _node_rviz,
-        _delayed_spawner,
+        _node_rviz,
+        _node_joint_state_broadcaster_spawner,
+        _node_diff_drive_controller_spawner
     ]
 
     return _to_run

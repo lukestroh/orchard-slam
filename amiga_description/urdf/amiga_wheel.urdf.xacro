@@ -37,7 +37,7 @@
       <axis xyz="${joint_axis_xyz}"/>
       <limit effort="30.0" velocity="50.0"/>
     </joint>
-
+    
   </xacro:macro>
 
 </robot>
