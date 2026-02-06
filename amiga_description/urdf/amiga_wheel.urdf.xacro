@@ -38,10 +38,6 @@
       <limit effort="30.0" velocity="50.0"/>
       <dynamics damping="0.1" friction="0.1"/>
     </joint>
-
-    <gazebo reference="${prefix}__${wheel_name}_joint">
-      <preserveFixedJoint>false</preserveFixedJoint>
-    </gazebo>
     
   </xacro:macro>
 
