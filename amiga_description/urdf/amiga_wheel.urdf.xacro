@@ -4,7 +4,7 @@
   <xacro:macro name="wheel"
     params="prefix wheel_name parent_link joint_origin_xyz joint_origin_rpy joint_axis_xyz wheel_radius wheel_width wheel_mass">
     
-    <link name="${prefix}${wheel_name}">
+    <link name="${prefix}__${wheel_name}">
       <visual>
         <origin xyz="0 0 0" rpy="1.5708 0 0"/>
         <geometry>
@@ -30,10 +30,10 @@
       </inertial>
     </link>
 
-    <joint name="${prefix}${wheel_name}_joint" type="continuous">
+    <joint name="${prefix}__${wheel_name}_joint" type="continuous">
       <origin xyz="${joint_origin_xyz}" rpy="${joint_origin_rpy}"/>
       <parent link="${parent_link}"/>
-      <child link="${prefix}${wheel_name}"/>
+      <child link="${prefix}__${wheel_name}"/>
       <axis xyz="${joint_axis_xyz}"/>
       <limit effort="30.0" velocity="50.0"/>
     </joint>

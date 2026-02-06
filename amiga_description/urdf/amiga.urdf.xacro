@@ -7,7 +7,7 @@
     <!-- Args -->
     <xacro:arg name="amiga_prefix" default="amiga_"/>
     <xacro:arg name="amiga_parent" default="world" />
-    <xacro:arg name="mesh_base_path" default=""/>
+    <xacro:arg name="sim_gazebo" default="false"/>
 
     <!-- amiga macro -->
     <xacro:include filename="./amiga_macro.urdf.xacro" />
@@ -15,7 +15,7 @@
     <xacro:amiga_macro
         amiga_prefix="$(arg amiga_prefix)"
         amiga_parent="$(arg amiga_parent)"
-        mesh_base_path="$(arg mesh_base_path)"
+        sim_gazebo="$(arg sim_gazebo)"
     />
     
     <!-- <joint name="world__$(arg amiga_prefix)base" type="fixed">

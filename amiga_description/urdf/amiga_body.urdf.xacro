@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="https://ros.org/wiki/xacro" name="amiga">
 
-  <xacro:macro name="amiga_body" params="prefix:='amiga_' amiga_parent:='world'">
+  <xacro:macro name="amiga_body" params="prefix:='amiga' amiga_parent:='world'">
     <material name="LightLightGrey">
       <color rgba="0.941 0.941 0.941 1.0"/>
     </material>
@@ -21,11 +21,11 @@
     <!-- <xacro:property name="amiga_tool0_mount_position" value="-0.12825037 0.323256 0.99810607"/> -->
     <xacro:property name="amiga_tool0_mount_position" value="-0.225 0.323256 ${0.99810607+0.1}"/> 
     
-    <link name="${prefix}body">
+    <link name="${prefix}__body">
       <visual>
         <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
         <geometry>
-          <mesh filename="package://amiga_description/meshes/frame_on_amiga_v2_simplified.stl"/>
+          <mesh filename="file://$(find amiga_description)/meshes/frame_on_amiga_v2_simplified.stl"/>
         </geometry>
         <material name="LightLightGrey"/>
       </visual>
@@ -61,7 +61,7 @@
       </inertial>
     </link>
 
-    <link name="${prefix}tool0"/>
+    <link name="${prefix}__tool0"/>
 
     <!-- ================== -->
     <!--       Joints       -->
@@ -71,15 +71,15 @@
         <parent link="${amiga_parent}"/>
         <child link="${prefix}base"/>
     </joint> -->
-    <joint name="${prefix}base__${prefix}body" type="fixed">
+    <joint name="${prefix}__base--${prefix}__body" type="fixed">
         <origin rpy="0 0 0" xyz="0 0 0"/>
-        <parent link="${prefix}base"/>
-        <child link="${prefix}body"/>
+        <parent link="${prefix}__base"/>
+        <child link="${prefix}__body"/>
     </joint>
-    <joint name="${prefix}body--${prefix}tool0" type="fixed">
+    <joint name="${prefix}__body--${prefix}__tool0" type="fixed">
         <origin rpy="${amiga_tool0_mount_rotation}" xyz="${amiga_tool0_mount_position}"/>
-        <parent link="${prefix}body"/>
-        <child link="${prefix}tool0"/>
+        <parent link="${prefix}__body"/>
+        <child link="${prefix}__tool0"/>
     </joint>
   </xacro:macro>
 </robot>
