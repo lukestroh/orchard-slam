@@ -91,13 +91,12 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         ],
     )
 
-
     _to_run = [
         _launch_amiga_description,
         _launch_gazebo,
         _node_rviz,
         _node_joint_state_broadcaster_spawner,
-        _node_diff_drive_controller_spawner
+        _node_diff_drive_controller_spawner,
     ]
 
     return _to_run
