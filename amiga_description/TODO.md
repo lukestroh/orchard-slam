@@ -12,4 +12,6 @@
 1. NOT FOR FINAL PROJECT: Write new hardware interface:
     - https://github.com/ros-controls/ros2_control_demos/blob/humble/example_2/hardware/diffbot_system.cpp
 
+1. Diff drive not working when the wheels are where they are supposed to be but if slightly shifted it works fine. probably collision problem?
+
     

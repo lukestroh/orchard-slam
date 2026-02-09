@@ -6,29 +6,26 @@ controller_manager:
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
-    diff_drive_base_controller:
+    diff_drive_controller:
       type: diff_drive_controller/DiffDriveController
 
 # https://control.ros.org/master/doc/ros2_controllers/diff_drive_controller/doc/userdoc.html
-diff_drive_base_controller:
+diff_drive_controller:
   ros__parameters:
-    left_wheel_names:
-      - $(var amiga_prefix)__left_wheel_front_joint
-      - $(var amiga_prefix)__left_wheel_rear_joint
-    right_wheel_names:
-      - $(var amiga_prefix)__right_wheel_front_joint
-      - $(var amiga_prefix)__right_wheel_rear_joint
-
-    wheel_separation: 0.5  # meters
-    wheel_radius: 0.3      # meters
+    left_wheel_names: ["amiga__left_wheel_front_joint", "amiga__left_wheel_rear_joint"]
+    right_wheel_names: ["amiga__right_wheel_front_joint", "amiga__right_wheel_rear_joint"]
+    wheel_separation: 1.0  # meters
+    wheel_radius: 0.25      # meters
 
     wheel_separation_multiplier: 1.0
     left_wheel_radius_multiplier: 1.0
     right_wheel_radius_multiplier: 1.0
 
+    use_stamped_vel: false
+
     publish_rate: 50.0
     odom_frame_id: odom
-    base_frame_id: chassis
+    base_frame_id: amiga__base
     pose_covariance_diagonal : [0.001, 0.001, 0.0, 0.0, 0.0, 0.01]
     twist_covariance_diagonal: [0.001, 0.0, 0.0, 0.0, 0.0, 0.01]
 

@@ -1,17 +1,48 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-  <xacro:macro name="wheel" params="prefix wheel_name parent_link joint_origin_xyz joint_origin_rpy joint_axis_xyz">
+  <xacro:macro name="wheel"
+    params="prefix wheel_name parent_link joint_origin_xyz joint_origin_rpy joint_axis_xyz wheel_radius wheel_width wheel_mass">
+    
+    <link name="${prefix}__${wheel_name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </visual>
 
-    <link name="${prefix}__${wheel_name}"/>
+      <collision>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <mass value="${wheel_mass}"/>
+        <inertia
+          ixx="${(wheel_mass*(3*wheel_radius*wheel_radius + wheel_width*wheel_width))/12.0}"
+          iyy="${(wheel_mass*wheel_radius*wheel_radius)/2.0}"
+          izz="${(wheel_mass*(3*wheel_radius*wheel_radius + wheel_width*wheel_width))/12.0}"
+          ixy="0" ixz="0" iyz="0"/>
+      </inertial>
+    </link>
 
     <joint name="${prefix}__${wheel_name}_joint" type="continuous">
       <origin xyz="${joint_origin_xyz}" rpy="${joint_origin_rpy}"/>
-      <parent link="${prefix}__${parent_link}"/>
+      <parent link="${parent_link}"/>
       <child link="${prefix}__${wheel_name}"/>
       <axis xyz="${joint_axis_xyz}"/>
+      <limit effort="30.0" velocity="50.0"/>
+      <dynamics damping="0.1" friction="0.1"/>
     </joint>
 
+    <gazebo reference="${prefix}__${wheel_name}_joint">
+      <preserveFixedJoint>false</preserveFixedJoint>
+    </gazebo>
+    
   </xacro:macro>
 
 </robot>

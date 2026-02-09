@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="https://ros.org/wiki/xacro" name="amiga">
 
-  <xacro:macro name="amiga_body" params="prefix:='amiga__' amiga_parent:='world'">
+  <xacro:macro name="amiga_body" params="prefix:='amiga' amiga_parent:='world'">
     <material name="LightLightGrey">
       <color rgba="0.941 0.941 0.941 1.0"/>
     </material>
@@ -21,7 +21,7 @@
     <!-- <xacro:property name="amiga_tool0_mount_position" value="-0.12825037 0.323256 0.99810607"/> -->
     <xacro:property name="amiga_tool0_mount_position" value="-0.225 0.323256 ${0.99810607+0.1}"/> 
     
-    <link name="${prefix}body">
+    <link name="${prefix}__body">
       <visual>
         <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
         <geometry>
@@ -29,24 +29,24 @@
         </geometry>
         <material name="LightLightGrey"/>
       </visual>
-      <collision>
+      <!-- <collision>
         <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 ${amiga_collision_box0_z / 2}"/>
         <geometry>
           <box size="${amiga_collision_box0_x} ${amiga_collision_box0_y} ${amiga_collision_box0_z}"/>
         </geometry>
-      </collision>
-      <collision>
+      </collision> -->
+      <!-- <collision>
         <origin rpy="0.0 0.0 0.0" xyz="0.0 -${amiga_collision_box1_y / 5} ${amiga_collision_box0_z}" />
         <geometry>
           <box size="${amiga_collision_box1_x} ${amiga_collision_box1_y} ${amiga_collision_box1_z}" />
         </geometry>
-      </collision>
-      <collision>
+      </collision> -->
+      <!-- <collision>
         <origin rpy="0.0 0.0 0.0" xyz="${amiga_collision_box0_x / 2 - amiga_collision_box2_x / 2} ${amiga_collision_box2_y / 3} ${amiga_collision_box0_z + amiga_collision_box1_z}" />
         <geometry>
           <box size="${amiga_collision_box2_x} ${amiga_collision_box2_y} ${amiga_collision_box2_z}" />
         </geometry>
-      </collision>
+      </collision> -->
 
       <inertial>
         <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
@@ -61,25 +61,21 @@
       </inertial>
     </link>
 
-    <link name="${prefix}tool0"/>
+    <link name="${prefix}__tool0"/>
 
     <!-- ================== -->
     <!--       Joints       -->
     <!-- ================== -->
-    <joint name="${amiga_parent}--${prefix}base" type ="fixed">
+
+    <joint name="${prefix}__base--${prefix}__body" type="fixed">
         <origin rpy="0 0 0" xyz="0 0 0"/>
-        <parent link="${amiga_parent}"/>
-        <child link="${prefix}base"/>
+        <parent link="${prefix}__base"/>
+        <child link="${prefix}__body"/>
     </joint>
-    <joint name="${prefix}base--${prefix}body" type="fixed">
-        <origin rpy="0 0 0" xyz="0 0 0"/>
-        <parent link="${prefix}base"/>
-        <child link="${prefix}body"/>
-    </joint>
-    <joint name="${prefix}body--${prefix}tool0" type="fixed">
+    <joint name="${prefix}__body--${prefix}__tool0" type="fixed">
         <origin rpy="${amiga_tool0_mount_rotation}" xyz="${amiga_tool0_mount_position}"/>
-        <parent link="${prefix}body"/>
-        <child link="${prefix}tool0"/>
+        <parent link="${prefix}__body"/>
+        <child link="${prefix}__tool0"/>
     </joint>
   </xacro:macro>
 </robot>
