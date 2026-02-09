@@ -17,7 +17,7 @@
   
   <xacro:amiga_body
     prefix="${amiga_prefix}"
-    amiga_parent="${amiga_prefix}base"
+    amiga_parent="${amiga_prefix}__base"
   />
   <xacro:wheel
     prefix="${amiga_prefix}"

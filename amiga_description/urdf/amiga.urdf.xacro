@@ -2,7 +2,7 @@
 <robot xmlns:xacro="https://ros.org/wiki/xacro" name="amiga">
 
     <!-- World link -->
-    <link name="world" />
+    <!-- <link name="world" /> -->
     
     <!-- Args -->
     <xacro:arg name="amiga_prefix" default="amiga"/>
