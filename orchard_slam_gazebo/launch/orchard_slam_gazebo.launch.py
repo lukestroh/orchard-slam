@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription, LaunchContext
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, OpaqueFunction, SetLaunchConfiguration
 from launch.conditions import UnlessCondition, IfCondition
 from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch.substitutions import (
@@ -68,7 +68,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     _node_gz_bridge_clock = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
-        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
+        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock", ],
         output="screen",
     )
 

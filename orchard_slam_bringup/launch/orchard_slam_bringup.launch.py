@@ -7,6 +7,7 @@ from launch.actions import (
     RegisterEventHandler,
     OpaqueFunction,
     TimerAction,
+    SetLaunchConfiguration
 )
 from launch.conditions import UnlessCondition, IfCondition
 from launch.event_handlers import OnProcessStart
@@ -19,7 +20,6 @@ from launch_ros.actions import Node
 import os
 
 import rclpy.logging
-
 logger = rclpy.logging.get_logger("orchard_slam.launch")
 
 
@@ -28,6 +28,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     gazebo_headless = LaunchConfiguration("gazebo_headless")
     launch_rviz = LaunchConfiguration("launch_rviz")
     world_sdf_file = LaunchConfiguration("world_sdf_file")
+    use_sim_time = LaunchConfiguration("use_sim_time")
+    SetLaunchConfiguration("use_sim_time", sim_gazebo).execute(context)
 
     # Package directories
     amiga_description_share = get_package_share_directory("amiga_description")
@@ -69,6 +71,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         name="rviz2",
         output="screen",
         arguments=["-d", os.path.join(orchard_slam_bringup_share, "rviz", "orchard_slam.rviz")],
+        parameters=[{"use_sim_time": use_sim_time}],
         condition=IfCondition(launch_rviz),
     )
 
@@ -80,6 +83,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
             "--controller-manager",
             "/controller_manager",
         ],
+        parameters=[{"use_sim_time": use_sim_time}],
     )
     _node_diff_drive_controller_spawner = Node(
         package="controller_manager",
@@ -89,6 +93,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
             "--controller-manager",
             "/controller_manager",
         ],
+        parameters=[{"use_sim_time": use_sim_time}],
     )
 
     _to_run = [

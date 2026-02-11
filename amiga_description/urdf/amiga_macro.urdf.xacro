@@ -1,13 +1,18 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="https://ros.org/wiki/xacro" name="amiga">
 
-<xacro:macro name="amiga_macro" params="amiga_prefix:='amiga_' amiga_parent:='world' sim_gazebo:='false'">
+<xacro:macro name="amiga_macro" params="amiga_prefix:='amiga' amiga_parent:='world' sim_gazebo:='false'">
   <!-- ================== -->
   <!--     Amiga Macro    -->
   <!-- ================== -->
   <xacro:include filename="./amiga_body.urdf.xacro" />
+  <xacro:include filename="./amiga_lidar.urdf.xacro" />
   <xacro:include filename="./amiga_wheel.urdf.xacro" />
   <xacro:include filename="./amiga_ros2_control.urdf.xacro" />
+
+  <xacro:property name="wheel_radius" value="0.25"/>
+  <xacro:property name="wheel_width" value="0.10"/>
+  <xacro:property name="wheel_mass" value="1.0"/>
 
    
   <!-- ================== -->
@@ -19,6 +24,11 @@
     prefix="${amiga_prefix}"
     amiga_parent="${amiga_prefix}__base"
   />
+  <xacro:lidar
+    prefix="${amiga_prefix}"
+    lidar_name="lidar"
+    parent_link="${amiga_prefix}__base"
+  />
   <xacro:wheel
     prefix="${amiga_prefix}"
     wheel_name="left_wheel_front"
@@ -26,9 +36,9 @@
     joint_origin_xyz="0.344 0.5 0.22"
     joint_origin_rpy="0 0 0"
     joint_axis_xyz="0 1 0"
-    wheel_radius="0.25"
-    wheel_width="0.10"
-    wheel_mass="1.0"
+    wheel_radius="${wheel_radius}"
+    wheel_width="${wheel_width}"
+    wheel_mass="${wheel_mass}"
   />
   <xacro:wheel
     prefix="${amiga_prefix}"
@@ -37,9 +47,9 @@
     joint_origin_xyz="0.344 -0.5 0.22"
     joint_origin_rpy="0 0 0"
     joint_axis_xyz="0 1 0"
-    wheel_radius="0.25"
-    wheel_width="0.10"
-    wheel_mass="1.0"
+    wheel_radius="${wheel_radius}"
+    wheel_width="${wheel_width}"
+    wheel_mass="${wheel_mass}"
   />
   <xacro:wheel
     prefix="${amiga_prefix}"
@@ -48,9 +58,9 @@
     joint_origin_xyz="-0.344 0.5 0.22"
     joint_origin_rpy="0 0 0"
     joint_axis_xyz="0 1 0"
-    wheel_radius="0.25"
-    wheel_width="0.10"
-    wheel_mass="1.0"
+    wheel_radius="${wheel_radius}"
+    wheel_width="${wheel_width}"
+    wheel_mass="${wheel_mass}"
   />
   <xacro:wheel
     prefix="${amiga_prefix}"
@@ -59,9 +69,9 @@
     joint_origin_xyz="-0.344 -0.5 0.22"
     joint_origin_rpy="0 0 0"
     joint_axis_xyz="0 1 0"
-    wheel_radius="0.25"
-    wheel_width="0.10"
-    wheel_mass="1.0"
+    wheel_radius="${wheel_radius}"
+    wheel_width="${wheel_width}"
+    wheel_mass="${wheel_mass}"
   />
   <xacro:amiga_ros2_control
     name="amiga"

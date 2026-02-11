@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument,OpaqueFunction, SetLaunchConfiguration
 from launch.event_handlers import OnProcessStart
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import AnyLaunchDescriptionSource
@@ -21,7 +21,9 @@ def setup_launch(context, *args, **kwargs):
     amiga_prefix = LaunchConfiguration("amiga_prefix")
     sim_gazebo = LaunchConfiguration("sim_gazebo")
     view_robot = LaunchConfiguration("view_robot")
-
+    use_sim_time = LaunchConfiguration("use_sim_time")
+    SetLaunchConfiguration("use_sim_time", sim_gazebo).execute(context)
+    
     # Your xacro
     amiga_share = get_package_share_directory("amiga_description")
     xacro_file = os.path.join(amiga_share, "urdf", "amiga.urdf.xacro")
@@ -60,11 +62,17 @@ def setup_launch(context, *args, **kwargs):
         package="robot_state_publisher",
         executable="robot_state_publisher",
         output="screen",
-        parameters=[{"robot_description": robot_description}],
+        parameters=[
+            {"robot_description": robot_description},
+            {"use_sim_time": use_sim_time},
+        ],
     )
 
     _node_joint_state_publisher_gui = Node(
-        package="joint_state_publisher_gui", executable="joint_state_publisher_gui", condition=IfCondition(view_robot)
+        package="joint_state_publisher_gui",
+        executable="joint_state_publisher_gui",
+        parameters=[{"use_sim_time": use_sim_time}],
+        condition=IfCondition(view_robot)
     )
 
     _node_rviz = Node(
@@ -76,7 +84,10 @@ def setup_launch(context, *args, **kwargs):
             "-d",
             os.path.join(get_package_share_directory("orchard_slam_bringup"), "rviz", "orchard_slam.rviz"),
         ],
-        parameters=[{"robot_description": robot_description}],
+        parameters=[
+            {"robot_description": robot_description},
+            {"use_sim_time": use_sim_time},
+        ],
         condition=IfCondition(view_robot),
     )
 
@@ -106,6 +117,7 @@ def generate_launch_description():
             choices=["true", "false"],
             description="Whether to launch RViz to view the robot",
         ),
+        dict(name="use_sim_time", default_value="false", choices=["true", "false"], description="Whether to use sim time"),
     ]
 
     declared_args = [
