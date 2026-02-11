@@ -54,7 +54,7 @@
 
     <gazebo>
       <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin"
-              filename="libgz_ros2_control-system">
+              filename="gz_ros2_control-system">
         <parameters>$(find amiga_description)/config/amiga_controllers.yaml</parameters>
         <controller_manager_name>controller_manager</controller_manager_name>
       </plugin>

@@ -38,32 +38,31 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         world_sdf_file.perform(context) + ".sdf",
     )
 
-    _launch_gz_server = IncludeLaunchDescription(
+    _launch_gz_sim = IncludeLaunchDescription(
         AnyLaunchDescriptionSource(
-            os.path.join(
-                gz_sim_pkg_share,
-                "launch",
-                "gz_server.launch.py",
-            )
+            os.path.join(gz_sim_pkg_share, "launch", "gz_sim.launch.py")
         ),
         launch_arguments={
-            "world_sdf_file": world_abs_path,
+            # headless: "-r -s" (run + server only)
+            # with GUI: "-r" (run + gui)
+            "gz_args": f"-r -s {world_abs_path}" if gazebo_headless.perform(context) == "true" else f"-r {world_abs_path}",
         }.items(),
     )
 
-    _launch_gz_sim = IncludeLaunchDescription(
-        AnyLaunchDescriptionSource(
-            os.path.join(
-                gz_sim_pkg_share,
-                "launch",
-                "gz_sim.launch.py",
-            )
-        ),
-        launch_arguments={
-            "gz_args": "-g",
-        }.items(),
-        condition=UnlessCondition(gazebo_headless),
-    )
+
+
+    # _launch_gz_server = IncludeLaunchDescription(
+    #     AnyLaunchDescriptionSource(
+    #         os.path.join(
+    #             gz_sim_pkg_share,
+    #             "launch",
+    #             "gz_server.launch.py",
+    #         )
+    #     ),
+    #     launch_arguments={
+    #         "world_sdf_file": world_abs_path,
+    #     }.items(),
+    # )
 
     _node_gz_bridge_clock = Node(
         package="ros_gz_bridge",
@@ -91,7 +90,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
 
     _to_run = [
         _set_env_var_gz_sim_resource_path,
-        _launch_gz_server,
+        # _launch_gz_server,
         _launch_gz_sim,
         _node_gz_bridge_clock,
         _node_spawn_robot,
