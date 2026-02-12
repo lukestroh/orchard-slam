@@ -64,10 +64,13 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     #     }.items(),
     # )
 
-    _node_gz_bridge_clock = Node(
+    bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
-        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
+        arguments=[
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+            "/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan"
+        ],
         output="screen",
     )
 
@@ -92,7 +95,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         _set_env_var_gz_sim_resource_path,
         # _launch_gz_server,
         _launch_gz_sim,
-        _node_gz_bridge_clock,
+        bridge,
         _node_spawn_robot,
     ]
     return _to_run
