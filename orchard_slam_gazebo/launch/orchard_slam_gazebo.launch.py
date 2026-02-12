@@ -69,7 +69,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         executable="parameter_bridge",
         arguments=[
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-            "/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan"
+            "/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan",
+            "/gps@sensor_msgs/msg/NavSatFix[gz.msgs.NavSat"
         ],
         output="screen",
     )

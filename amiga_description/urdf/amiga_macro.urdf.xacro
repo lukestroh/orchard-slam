@@ -7,6 +7,7 @@
   <!-- ================== -->
   <xacro:include filename="./amiga_body.urdf.xacro" />
   <xacro:include filename="./amiga_lidar.urdf.xacro" />
+  <xacro:include filename="./amiga_gps.urdf.xacro" />
   <xacro:include filename="./amiga_wheel.urdf.xacro" />
   <xacro:include filename="./amiga_ros2_control.urdf.xacro" />
 
@@ -27,6 +28,11 @@
   <xacro:lidar
     prefix="${amiga_prefix}"
     lidar_name="lidar"
+    parent_link="${amiga_prefix}__base"
+  />
+  <xacro:gps
+    prefix="${amiga_prefix}"
+    gps_name="gps"
     parent_link="${amiga_prefix}__base"
   />
   <xacro:wheel
