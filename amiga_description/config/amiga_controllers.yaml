@@ -14,7 +14,7 @@ diff_drive_controller:
   ros__parameters:
     left_wheel_names: ["amiga__left_wheel_front_joint", "amiga__left_wheel_rear_joint"]
     right_wheel_names: ["amiga__right_wheel_front_joint", "amiga__right_wheel_rear_joint"]
-    wheel_separation: 1.0  # meters
+    wheel_separation: 0.536  # meters
     wheel_radius: 0.25      # meters
 
     wheel_separation_multiplier: 1.0
