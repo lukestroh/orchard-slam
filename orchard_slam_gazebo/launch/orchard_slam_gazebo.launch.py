@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription, LaunchContext
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, OpaqueFunction, RegisterEventHandler, TimerAction
 from launch.conditions import UnlessCondition, IfCondition
+from launch.event_handlers import OnProcessStart, OnProcessExit
 from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
 )
 from launch_ros.actions import Node
+
+import orchard_slam_gazebo.spawn_trees as st
+
 import os
 
 import rclpy.logging
-
 logger = rclpy.logging.get_logger("orchard_slam_gazebo.launch")
 
 
@@ -64,7 +67,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     #     }.items(),
     # )
 
-    bridge = Node(
+    _node_gz_ros2_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
         arguments=[
@@ -92,13 +95,75 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         output="screen",
     )
 
+    orchard_config = st.generate_orchard_config(
+        orchard_name="small_orchard",
+        tree_namespace="lpy",
+        tree_type="envy",
+        n_rows=5,
+        orchard_seed=42,
+        avg_trees_per_row=10,
+        trees_per_row_std=2,
+        avg_tree_spacing=3.0,
+        tree_spacing_std=0.5,
+        avg_row_deviation=0.2,
+        std_row_deviation=0.1,
+        avg_row_spacing=5.0,
+        row_spacing_std=0.5,
+        initial_offset=(2.0, 2.0),
+    )
+    orchard_sdfs = st.generate_all_tree_sdfs(orchard_config)
+
+    # # Get tree data for spawning
+    # test_tree_id = 'lpy_envy_00094'
+    # tree_data = orchard_sdfs[test_tree_id]
+    # tree_pose = tree_data['pose']  # [x, y]
+
+    tree_spawners = []
+    for tree_id, tree_sdf in orchard_sdfs.items():
+        _node_spawn_tree = Node(
+            package="ros_gz_sim",
+            executable="create",
+            arguments=[
+                '-world', world_sdf_file.perform(context),
+                '-string', tree_sdf['sdf'],
+                '-x', str(tree_sdf['pose'][0]),
+                '-y', str(tree_sdf['pose'][1]),
+                '-z', '0',
+            ],
+            output="screen",
+        )
+        tree_spawners.append(_node_spawn_tree)
+    
+    _register_event_handler_delay_tree_spawners_after_gz_launch = []
+    for tree_spawner in tree_spawners:
+        # _register_event_handler_delay_tree_spawners_after_gz_launch.append(
+        #     RegisterEventHandler(
+        #         event_handler = OnProcessStart(
+        #             target_action=tree_spawner,
+        #             on_start=[
+        #                 TimerAction(
+        #                     period=10.0,
+        #                     actions=[tree_spawner],
+        #                 ),
+        #             ]
+        #         ),
+        #     )
+        # )
+        _register_event_handler_delay_tree_spawners_after_gz_launch.append(
+            TimerAction(
+                period=6.0,
+                actions=[tree_spawner],
+            ),
+        )
+
     _to_run = [
         _set_env_var_gz_sim_resource_path,
         # _launch_gz_server,
         _launch_gz_sim,
-        bridge,
+        _node_gz_ros2_bridge,
         _node_spawn_robot,
-    ]
+        # _node_spawn_tree
+    ] + _register_event_handler_delay_tree_spawners_after_gz_launch
     return _to_run
 
 
