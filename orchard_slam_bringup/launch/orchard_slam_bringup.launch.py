@@ -115,14 +115,6 @@ def generate_launch_description():
         ),
     ]
 
-    declared_args = [
-        DeclareLaunchArgument(
-            name=config.get("name"),
-            default_value=config.get("default_value"),
-            choices=config.get("choices"),
-            description=config.get("description"),
-        )
-        for config in declared_configs
-    ]
+    declared_args = [DeclareLaunchArgument(**config) for config in declared_configs]
 
     return LaunchDescription(declared_args + [OpaqueFunction(function=launch_setup)])

@@ -142,7 +142,6 @@ def get_trees_from_file(file_path: str):
 
 def save_orchard_to_file(orchard_config: dict, output_dir: str) -> str:
     """Saves the orchard configuration to a file.
-    TODO: json format
     :param orchard_config: dict containing the orchard configuration
     :type orchard_config: dict
     :param file_name: name of the file to save the orchard configuration
