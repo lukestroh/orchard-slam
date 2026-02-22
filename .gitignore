@@ -222,3 +222,6 @@ install/
 log/
 .vscode/
 .vscode/
+
+data/
+orchard_slam_gazebo/meshes/
