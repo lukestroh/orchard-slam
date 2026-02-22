@@ -176,6 +176,7 @@ def save_orchard_to_file(orchard_config: dict, output_dir: str) -> str:
 def generate_tree_sdf(tree_id_str: str, tree_pose: tuple) -> str:
     """Generates an SDF string for a tree model with the given tree ID."""
     file_uri = get_package_share_directory("orchard_slam_gazebo") + f"/meshes/obj/{tree_id_str}.obj"
+    brown_gray = "0.43137254902 0.407843137255 0.356862745098 1"
     sdf_str =  f"""<?xml version="1.0"?>
                     <sdf version="1.8">
                         <model name="{tree_id_str}">
@@ -189,9 +190,9 @@ def generate_tree_sdf(tree_id_str: str, tree_pose: tuple) -> str:
                                     </mesh>
                                 </geometry>
                                 <material>
-                                    <ambient>0.43137254902 0.407843137255 0.356862745098 1</ambient>
-                                    <diffuse>0.43137254902 0.407843137255 0.356862745098 1</diffuse>
-                                    <specular>0.43137254902 0.407843137255 0.356862745098 1</specular>
+                                    <ambient>{brown_gray}</ambient>
+                                    <diffuse>{brown_gray}</diffuse>
+                                    <specular>{brown_gray}</specular>
                                 </material>
                             </visual>
                             <collision name="{tree_id_str}_collision"><geometry><mesh><uri>file://{file_uri}</uri></mesh></geometry></collision>
