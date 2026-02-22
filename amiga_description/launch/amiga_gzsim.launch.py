@@ -35,10 +35,14 @@ def generate_launch_description():
         parameters=[{"use_sim_time": True, "robot_description": robot_description}],
     )
 
-    clock_bridge = Node(
+    bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
-        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
+        arguments=[
+            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+            "/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan",
+            "/gps@sensor_msgs/msg/NavSatFix[gz.msgs.NavSat"
+        ],
         output="screen",
     )
 
@@ -67,4 +71,4 @@ def generate_launch_description():
         ],
     )
 
-    return LaunchDescription([gz_launch, rsp, spawn, clock_bridge])
+    return LaunchDescription([gz_launch, rsp, spawn, bridge])

@@ -20,12 +20,12 @@
       </collision>
 
       <inertial>
-        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <mass value="${wheel_mass}"/>
         <inertia
-          ixx="${(wheel_mass*(3*wheel_radius*wheel_radius + wheel_width*wheel_width))/12.0}"
-          iyy="${(wheel_mass*wheel_radius*wheel_radius)/2.0}"
-          izz="${(wheel_mass*(3*wheel_radius*wheel_radius + wheel_width*wheel_width))/12.0}"
+          ixx="${(wheel_mass*(3*wheel_radius**2 + wheel_width**2))/12.0}"
+          iyy="${(wheel_mass*wheel_radius**2)/2.0}"
+          izz="${(wheel_mass*(3*wheel_radius**2 + wheel_width**2))/12.0}"
           ixy="0" ixz="0" iyz="0"/>
       </inertial>
     </link>
@@ -36,11 +36,16 @@
       <child link="${prefix}__${wheel_name}"/>
       <axis xyz="${joint_axis_xyz}"/>
       <limit effort="30.0" velocity="50.0"/>
-      <dynamics damping="0.1" friction="0.1"/>
+      <dynamics damping="0.5" friction="0.5"/>
     </joint>
 
     <gazebo reference="${prefix}__${wheel_name}_joint">
-      <preserveFixedJoint>false</preserveFixedJoint>
+      <mu1>1.0</mu1> <!-- longitudinal friction (rolling direction) -->
+      <mu2>0.3</mu2> <!-- lateral friction (sideways direction) -->
+      <kp>1e6</kp>         <!-- contact stiffness -->
+      <kd>10.0</kd>        <!-- contact damping -->
+      <minDepth>0.001</minDepth> <!-- minimum depth for contact -->
+      <maxContacts>1</maxContacts>
     </gazebo>
     
   </xacro:macro>
