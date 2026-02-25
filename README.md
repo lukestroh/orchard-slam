@@ -17,6 +17,9 @@ install(DIRECTORY launch
 )
 ```
 
+### Adding tree meshes
+Unzip the meshes.zip file under orchard_slam_gazebo/meshes.
+
 ### Other installations
 Add any other missing packages using:
 
