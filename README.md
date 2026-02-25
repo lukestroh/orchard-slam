@@ -5,7 +5,21 @@ This is a set of ROS2 Kilted packages that allow a Farm-ng Amiga to navigate thr
 NOTE: Currently only developing for Gazebo.
 
 ## Installation
-TODO: need more
+### Installing `slam_toolbox`
+```
+git clone -b humble_lifecycle git@github.com:SteveMacenski/slam_toolbox.git
+```
+Next, go into the CMakeLists.txt and uncomment the following line:
+```
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+  # PATTERN "lifelong_launch.py" EXCLUDE
+)
+```
+
+### Other installations
+Add any other missing packages using:
+
 ```
 rosdep install --from-paths src --ignore-src -r -y
 ```
