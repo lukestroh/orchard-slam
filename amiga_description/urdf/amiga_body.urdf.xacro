@@ -23,7 +23,7 @@
     
     <link name="${prefix}__body">
       <visual>
-        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+        <origin rpy="0.0 0.0 3.14159265359" xyz="0.0 0.0 0.0"/>
         <geometry>
           <mesh filename="file://$(find amiga_description)/meshes/frame_on_amiga_v2_simplified.stl"/>
         </geometry>
@@ -49,7 +49,7 @@
       </collision> -->
 
       <inertial>
-        <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+        <origin rpy="0 0 3.14159265359" xyz="0.0 0.0 0.0"/>
         <mass value="${amiga_mass}"/>
         <inertia ixx="${1/12 * amiga_mass * (amiga_collision_box0_y**2 + amiga_collision_box0_z**2)}"
                 ixz="0.0" 
