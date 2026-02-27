@@ -11,7 +11,7 @@
   <xacro:include filename="./amiga_wheel.urdf.xacro" />
   <xacro:include filename="./amiga_ros2_control.urdf.xacro" />
 
-  <xacro:property name="wheel_radius" value="0.25"/>
+  <xacro:property name="wheel_radius" value="0.2"/>
   <xacro:property name="wheel_width" value="0.10"/>
   <xacro:property name="wheel_mass" value="1.0"/>
 
