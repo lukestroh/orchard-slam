@@ -5,6 +5,8 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /RobotModel1/Description Topic1
+        - /Map1
+        - /Map1/Topic1
       Splitter Ratio: 0.5
     Tree Height: 1820
   - Class: rviz_common/Selection
@@ -157,7 +159,7 @@ Visualization Manager:
       Name: Map
       Topic:
         Depth: 5
-        Durability Policy: Volatile
+        Durability Policy: Transient Local
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
@@ -216,7 +218,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 14.011277198791504
+      Distance: 17.73618507385254
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -231,10 +233,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5853980779647827
+      Pitch: 0.6297968626022339
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.7753921747207642
+      Yaw: 0.5704062581062317
     Saved: ~
 Window Geometry:
   Displays:
