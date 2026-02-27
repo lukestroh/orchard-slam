@@ -73,7 +73,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         arguments=[
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
             "/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan",
-            "/gps@sensor_msgs/msg/NavSatFix[gz.msgs.NavSat"
+            "/gps@sensor_msgs/msg/NavSatFix[gz.msgs.NavSat",
+            "/imu@sensor_msgs/msg/Imu[gz.msgs.IMU",
         ],
         output="screen",
     )
