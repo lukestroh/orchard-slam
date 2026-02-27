@@ -5,6 +5,7 @@
 
     <xacro:property name="lidar_mass" value="1.0"/>
     <xacro:property name="lidar_xyz" value="-0.65 0 ${1.132/2}"/>
+    <xacro:property name="lidar_rpy" value="0 0 3.14159265359"/>
 
     <link name="${prefix}__${lidar_name}">
       <visual>
@@ -29,7 +30,7 @@
     </link>
 
     <joint name="${prefix}__${lidar_name}_joint" type="fixed">
-      <origin xyz="${lidar_xyz}" rpy="0 0 0"/>
+      <origin xyz="${lidar_xyz}" rpy="${lidar_rpy}"/>
       <parent link="${parent_link}"/>
       <child link="${prefix}__${lidar_name}"/>
     </joint>
@@ -47,8 +48,8 @@
             <horizontal>
               <samples>360</samples>
               <resolution>1</resolution>
-              <min_angle>-3.14159</min_angle>
-              <max_angle>3.14159</max_angle>
+              <min_angle>-1.57079632679</min_angle>
+              <max_angle>1.57079632679</max_angle>
             </horizontal>
           </scan>
           <range>
