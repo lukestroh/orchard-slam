@@ -9,7 +9,7 @@ NOTE: Currently only developing for Gazebo.
 ```
 git clone -b humble_lifecycle git@github.com:SteveMacenski/slam_toolbox.git
 ```
-Next, go into the CMakeLists.txt and uncomment the following line:
+Next, go into the CMakeLists.txt and comment out the following line:
 ```
 install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
