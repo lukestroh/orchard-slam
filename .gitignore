@@ -225,3 +225,5 @@ log/
 
 data/
 orchard_slam_gazebo/meshes/
+maps/*.data
+maps/*.posegraph
