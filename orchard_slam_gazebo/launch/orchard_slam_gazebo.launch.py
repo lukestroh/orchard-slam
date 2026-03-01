@@ -13,6 +13,7 @@ from launch_ros.actions import Node
 
 import orchard_slam_gazebo.spawn_trees as st
 
+import ast
 import os
 
 import rclpy.logging
@@ -23,6 +24,23 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     # Launch configurations
     gazebo_headless = LaunchConfiguration("gazebo_headless")
     world_sdf_file = LaunchConfiguration("world_sdf_file")
+
+    # Orchard generation launch configurations
+    orchard_name = LaunchConfiguration("orchard_name")
+    orchard_seed = LaunchConfiguration("orchard_seed")
+    orchard_origin_offset = LaunchConfiguration("orchard_origin_offset")
+    tree_namespace = LaunchConfiguration("tree_namespace")
+    tree_type = LaunchConfiguration("tree_type")
+    num_rows = LaunchConfiguration("num_rows")
+    avg_trees_per_row = LaunchConfiguration("avg_trees_per_row")
+    avg_tree_spacing = LaunchConfiguration("avg_tree_spacing")
+    avg_row_deviation = LaunchConfiguration("avg_row_deviation")
+    avg_row_spacing = LaunchConfiguration("avg_row_spacing")
+    std_trees_per_row = LaunchConfiguration("std_trees_per_row")
+    std_tree_spacing = LaunchConfiguration("std_tree_spacing")
+    std_row_deviation = LaunchConfiguration("std_row_deviation")
+    std_row_spacing = LaunchConfiguration("std_row_spacing")
+
 
     # Package directories
     gz_sim_pkg_share = get_package_share_directory("ros_gz_sim")
@@ -96,20 +114,20 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     )
 
     orchard_config = st.generate_orchard_config(
-        orchard_name="small_orchard",
-        tree_namespace="lpy",
-        tree_type="envy",
-        n_rows=5,
-        orchard_seed=42,
-        avg_trees_per_row=10,
-        trees_per_row_std=2,
-        avg_tree_spacing=3.0,
-        tree_spacing_std=0.5,
-        avg_row_deviation=0.2,
-        std_row_deviation=0.1,
-        avg_row_spacing=5.0,
-        row_spacing_std=0.5,
-        initial_offset=(2.0, 2.0),
+        orchard_name=orchard_name.perform(context),
+        tree_namespace=tree_namespace.perform(context),
+        tree_type=tree_type.perform(context),
+        n_rows=int(num_rows.perform(context)),
+        orchard_seed=int(orchard_seed.perform(context)),
+        avg_trees_per_row=float(avg_trees_per_row.perform(context)),
+        trees_per_row_std=float(std_trees_per_row.perform(context)),
+        avg_tree_spacing=float(avg_tree_spacing.perform(context)),
+        tree_spacing_std=float(std_tree_spacing.perform(context)),
+        avg_row_deviation=float(avg_row_deviation.perform(context)),
+        std_row_deviation=float(std_row_deviation.perform(context)),
+        avg_row_spacing=float(avg_row_spacing.perform(context)),
+        row_spacing_std=float(std_row_spacing.perform(context)),
+        initial_offset=ast.literal_eval(orchard_origin_offset.perform(context))
     )
     orchard_sdfs = st.generate_all_tree_sdfs(orchard_config)
 
@@ -123,6 +141,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         _node_spawn_tree = Node(
             package="ros_gz_sim",
             executable="create",
+            name=f"spawn_{tree_id}",
             arguments=[
                 '-world', world_sdf_file.perform(context),
                 '-string', tree_sdf['sdf'],
@@ -134,22 +153,9 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         )
         tree_spawners.append(_node_spawn_tree)
     
-    _register_event_handler_delay_tree_spawners_after_gz_launch = []
+    _delay_tree_spawners_after_gz_launch = []
     for tree_spawner in tree_spawners:
-        # _register_event_handler_delay_tree_spawners_after_gz_launch.append(
-        #     RegisterEventHandler(
-        #         event_handler = OnProcessStart(
-        #             target_action=tree_spawner,
-        #             on_start=[
-        #                 TimerAction(
-        #                     period=10.0,
-        #                     actions=[tree_spawner],
-        #                 ),
-        #             ]
-        #         ),
-        #     )
-        # )
-        _register_event_handler_delay_tree_spawners_after_gz_launch.append(
+        _delay_tree_spawners_after_gz_launch.append(
             TimerAction(
                 period=6.0,
                 actions=[tree_spawner],
@@ -162,8 +168,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         _launch_gz_sim,
         _node_gz_ros2_bridge,
         _node_spawn_robot,
-        # _node_spawn_tree
-    ] + _register_event_handler_delay_tree_spawners_after_gz_launch
+    ] + _delay_tree_spawners_after_gz_launch
     return _to_run
 
 
@@ -171,6 +176,20 @@ def generate_launch_description():
     declared_configs = [
         dict(name="gazebo_headless", default_value="false", choices=["true", "false"]),
         dict(name="world_sdf_file", default_value="small_orchard", choices=["room", "large_orchard", "small_orchard"]),
+        dict(name="orchard_name", default_value="small_orchard", description="Name of the orchard configuration to generate (without .yaml extension)"),
+        dict(name="orchard_seed", default_value="12", description="Random seed for orchard generation"),
+        dict(name="orchard_origin_offset", default_value="(2.0,2.0)", description="Offset of the orchard origin from the world origin (x,y)"),
+        dict(name="tree_namespace", default_value="lpy", description="Namespace for all tree entities in Gazebo"),
+        dict(name="tree_type", default_value="envy", choices=['envy', 'ufo'], description="Type of tree to generate (e.g. apple, orange, etc.)"),
+        dict(name="num_rows", default_value="5", description="Number of rows in the orchard"),
+        dict(name="avg_trees_per_row", default_value="10", description="Average number of trees per row in the orchard"),
+        dict(name="avg_tree_spacing", default_value="3.0", description="Average spacing between trees in the orchard (meters)"),
+        dict(name="std_trees_per_row", default_value="2.0", description="Standard deviation of number of trees per row in the orchard"),
+        dict(name="std_tree_spacing", default_value="1.0", description="Standard deviation of spacing between trees in the orchard (meters)"),
+        dict(name="avg_row_deviation", default_value="0.2", description="Average deviation from straight rows in the orchard (meters)"),
+        dict(name="std_row_deviation", default_value="0.1", description="Standard deviation of row deviation in the orchard (meters)"),
+        dict(name="avg_row_spacing", default_value="5.0", description="Average spacing between rows in the orchard (meters)"),
+        dict(name="std_row_spacing", default_value="0.5", description="Standard deviation of row spacing in the orchard (meters)"),
     ]
 
     declared_args = [DeclareLaunchArgument(**config) for config in declared_configs]
