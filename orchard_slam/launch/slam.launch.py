@@ -38,53 +38,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         }.items(),
     )
 
-    # # Nodes launching commands
-    # _node_map_saver_server = Node(
-    #         package='nav2_map_server',
-    #         executable='map_saver_server',
-    #         name='map_saver_server',
-    #         output='screen',
-    #         emulate_tty=True,  # https://github.com/ros2/launch/issues/188
-    #         parameters=[{'save_map_timeout': 5.0},
-    #                     {'free_thresh_default': 0.25},
-    #                     {'occupied_thresh_default': 0.65}]
-    # )
-
-    # _node_map_server = Node(
-    #     package="nav2_map_server",
-    #     executable="map_server",
-    #     name="map_server",
-    #     parameters=[
-    #         {"use_sim_time": use_sim_time},
-    #         {
-    #             "yaml_filename": os.path.join(
-    #                 os.path.join(os.path.expanduser("~"), "maps", world.perform(context=context) + "_map.yaml")
-    #             ),
-    #         },
-    #     ],
-    #     condition=IfCondition(load_map),
-    # )
-
-    # Build node names list conditionally based on load_map
-    node_names = ['map_saver_server']
-    if load_map.perform(context) == 'true':
-        node_names.append('map_server')
-
-    # _node_nav2_lifecycle_manager = Node(
-    #     package='nav2_lifecycle_manager',
-    #     executable='lifecycle_manager',
-    #     name='lifecycle_manager',
-    #     output='screen',
-    #     emulate_tty=True,  # https://github.com/ros2/launch/issues/188
-    #     parameters=[{'use_sim_time': use_sim_time},
-    #                 {'autostart': True},
-    #                 {'node_names': node_names}
-    #     ]
-    # )
-
     _to_run = [
         _launch_slam_toolbox_lifelong,
-        # _node_nav2_lifecycle_manager,
     ]
     return _to_run
 
