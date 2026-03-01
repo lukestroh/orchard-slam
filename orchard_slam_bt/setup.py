@@ -1,5 +1,8 @@
 from setuptools import find_packages, setup
 
+import os
+import glob
+
 package_name = "orchard_slam_bt"
 
 setup(
@@ -9,6 +12,7 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
+        (os.path.join("share", package_name, "launch"), glob.glob("launch/*.launch.py")),
     ],
     package_data={"": ["py.typed"]},
     install_requires=["setuptools"],
@@ -23,6 +27,8 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": [],
+        "console_scripts": [
+            "run_slam_tree = orchard_slam_bt.run_slam_tree:main",
+        ],
     },
 )

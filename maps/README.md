@@ -1,0 +1,2 @@
+# Maps
+Maps are generated as serialized posegraphs using the `slam_toolbox/serialize_map` topic. You can load in maps using the `/slam_toolbox/deserialize_map` topic. We recommend using the behaviors in the `orchard_slam_bt` package.
