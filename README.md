@@ -31,7 +31,7 @@ rosdep install --from-paths src --ignore-src -r -y
 ## Launching the files
 To run the complete package, all launches should be run from the `orchard_slam_bringup` package.
 ```
-ros2 launch orchard_slam_bringup orchard_slam_brinup.launch.py
+ros2 launch orchard_slam_bringup orchard_slam_bringup.launch.py
 ```
 
 ## Package structure
