@@ -1,0 +1,37 @@
+# https://docs.ros.org/en/melodic/api/robot_localization/html/navsat_transform_node.html
+navsat_transform:
+  ros__parameters:
+    frequency: 10.0
+    delay: 0.0
+    zero_altitude: true # set to false if you want to use altitude from GPS. This is often noisy and not needed for 2D navigation.
+
+    publish_filtered_gps: true # set to false if you don't want the GPS position to be published as a nav_msgs/Odometry message
+    broadcast_utm_transform: false # set to true if you want the node to broadcast a transform from the UTM frame to the base_link frame. This is often not needed if you are using a robot_localization EKF that can handle the GPS data directly.
+    broadcast_utm_transform_as_parent_frame: false # If true, navsat_transform_node will publish the utm->world_frame transform instead of the world_frame->utm transform. Note that for the transform to be published broadcast_utm_transform also has to be set to true.
+
+    # Inputs
+    gps_topic: /gps/fix
+    imu_topic: /imu
+    odom_topic: /odometry/filtered/global
+
+    # Output
+    output_topic: /odometry/gps
+
+    # Frame configuration
+    world_frame: map
+    base_link_frame: amiga__base
+    
+    # If your IMU yaw is not absolute (no mag), use_odometry_yaw can work better.
+    # Try false first if your IMU provides a stable heading.
+    use_odometry_yaw: false
+
+    # Set these if you have a magnetometer / know declination & offsets.
+    magnetic_declination_radians: 0.0
+    yaw_offset: 0.0
+
+    transform_timeout: 0.2
+
+    # In ROS 2 you may also see/need this depending on distro/version:
+    # broadcast_utm_transform: false
+    # broadcast_utm_transform_as_parent_frame: false
+    # zero_altitude: true 

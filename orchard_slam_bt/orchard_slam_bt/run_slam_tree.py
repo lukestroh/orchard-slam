@@ -5,7 +5,8 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.parameter import Parameter
 from orchard_slam_bringup.logger_node import LoggerNode
 
-from orchard_slam_bt.behaviors.save_map import SaveMapBehavior
+from orchard_slam_bt.behaviors.save_posegraph import SavePosegraphBehavior
+from orchard_slam_bt.behaviors.load_posegraph import LoadPosegraphBehavior
 
 
 class RunSlamTree(LoggerNode):
@@ -34,12 +35,12 @@ class RunSlamTree(LoggerNode):
     
     def create_behavior_tree(self):
         # Behaviors
-        save_map_behavior = SaveMapBehavior(name="save_map_behavior", map_name=self.map_name)
+        save_posegraph_behavior = SavePosegraphBehavior(name="save_posegraph_behavior", map_name=self.map_name)
 
         root_sequence = pt.composites.Sequence(
             name="RunSlamTree",
             children=[
-                save_map_behavior
+                save_posegraph_behavior
             ],
             memory=False,
         )

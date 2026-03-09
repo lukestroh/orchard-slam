@@ -12,7 +12,7 @@ import os
 ros2 service call /slam_toolbox/serialize_map slam_toolbox/srv/SerializePoseGraph "{filename: '$HOME/orchard_slam_ws/src/orchard-slam/maps/map_name'}"
 """
 
-class SaveMapBehavior(pt.behaviour.Behaviour):
+class SavePosegraphBehavior(pt.behaviour.Behaviour):
     def __init__(self, name: str, map_name: str):
         super().__init__(name)
         self.name = name
@@ -38,7 +38,7 @@ class SaveMapBehavior(pt.behaviour.Behaviour):
         return True
     
     def initialise(self) -> None:
-        """Call the SaveMap service"""
+        """Call the SavePosegraph service"""
         self.node.info(f"Requesting map save with name: {self.map_name}")
 
         map_name_abs_path = os.path.join(os.path.expanduser('~'), "orchard_slam_ws/src/orchard-slam/maps", self.map_name)

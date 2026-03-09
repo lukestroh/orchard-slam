@@ -15,11 +15,11 @@
     </link>
 
     <gazebo reference="${prefix}__${gps_name}_link">
-    <sensor name="navsat_sensor" type="navsat">
+      <sensor name="navsat_sensor" type="navsat">
         <always_on>1</always_on>
         <update_rate>10</update_rate>
-        <topic>gps</topic>
-    </sensor>
+        <topic>gps/fix</topic>
+      </sensor>
     </gazebo>
 
     
