@@ -40,6 +40,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     std_tree_spacing = LaunchConfiguration("std_tree_spacing")
     std_row_deviation = LaunchConfiguration("std_row_deviation")
     std_row_spacing = LaunchConfiguration("std_row_spacing")
+    robot_x = LaunchConfiguration("robot_x")
+    robot_y = LaunchConfiguration("robot_y")
 
 
     # Package directories
@@ -101,7 +103,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         }],
     )
 
-    _node_static_tf_gps_frame_fix = Node(
+    _node_static_tf_gps_frame_fix = Node( # this fixes a weird issue where the gps frame is published as "amiga/amiga__base/navsat_sensor" instead of "amiga__gps_link", which causes the navsat_transform node to not find the gps frame and throw errors
         package="tf2_ros",
         executable="static_transform_publisher",
         name="static_tf_gps_frame_fix",
@@ -114,14 +116,12 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         executable="create",
         arguments=[
             "-r",
-            "-z",
-            "1.0",
-            "-topic",
-            "robot_description",
-            "-name",
-            "amiga",
-            "-allow_renaming",
-            "true",
+            "-x", robot_x,
+            "-y", robot_y,
+            "-z", "1.0",
+            "-topic", "robot_description",
+            "-name", "amiga",
+            "-allow_renaming", "true",
         ],
         output="screen",
     )
@@ -204,6 +204,8 @@ def generate_launch_description():
         dict(name="std_row_deviation", default_value="0.1", description="Standard deviation of row deviation in the orchard (meters)"),
         dict(name="avg_row_spacing", default_value="5.0", description="Average spacing between rows in the orchard (meters)"),
         dict(name="std_row_spacing", default_value="0.5", description="Standard deviation of row spacing in the orchard (meters)"),
+        dict(name="robot_x", default_value="0.0", description="Robot spawn X position (meters)"),
+        dict(name="robot_y", default_value="0.0", description="Robot spawn Y position (meters)"),
     ]
 
     declared_args = [DeclareLaunchArgument(**config) for config in declared_configs]
