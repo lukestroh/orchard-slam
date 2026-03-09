@@ -91,9 +91,21 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         arguments=[
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
             "/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan",
-            "/gps@sensor_msgs/msg/NavSatFix[gz.msgs.NavSat",
+            "/gps/fix@sensor_msgs/msg/NavSatFix[gz.msgs.NavSat",
             "/imu@sensor_msgs/msg/Imu[gz.msgs.IMU",
         ],
+        output="screen",
+        parameters=[{
+            "qos_overrides./imu.publisher.reliability": "best_effort",
+            "qos_overrides./gps/fix.publisher.reliability": "best_effort",
+        }],
+    )
+
+    _node_static_tf_gps_frame_fix = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="static_tf_gps_frame_fix",
+        arguments=["0", "0", "0", "0", "0", "0", "amiga__gps_link", "amiga/amiga__base/navsat_sensor"],
         output="screen",
     )
 
@@ -166,6 +178,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     _to_run = [
         _set_env_var_gz_sim_resource_path,
         # _launch_gz_server,
+        _node_static_tf_gps_frame_fix,
         _launch_gz_sim,
         _node_gz_ros2_bridge,
         _node_spawn_robot,
