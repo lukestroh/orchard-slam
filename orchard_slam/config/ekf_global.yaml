@@ -1,0 +1,34 @@
+ekf_global:
+  ros__parameters:
+    two_d_mode: true
+    publish_tf: true
+
+    base_link_frame: amiga__base
+    world_frame: map
+    map_frame: map
+    odom_frame: odom
+    
+
+    # Using config from diagram:
+    # https://docs.ros.org/en/melodic/api/robot_localization/html/integrating_gps.html
+
+    odom0: /diff_drive_controller/odom
+    odom0_config: [false, false, false, # x, y, z
+                  false, false, false,  # roll, pitch, yaw
+                  true, true, false,    # vx, vy, vz
+                  false, false, true,   # vroll, vpitch, vyaw
+                  false, false, false]  # ax, ay, az
+
+    odom1: /odometry/gps
+    odom1_config: [true,  true,  false, # x, y, z
+                  false, false, false,  # roll, pitch, yaw
+                  false, false, false,  # vx, vy, vz
+                  false, false, false,  # vroll, vpitch, vyaw
+                  false, false, false]  # ax, ay, az
+
+    imu0: /imu
+    imu0_config: [false, false, false, # x, y, z
+                  false, false, true, # roll, pitch, yaw
+                  false, false, false, # vx, vy, vz
+                  false, false, true,  # vroll, vpitch, vyaw
+                  true, true, false] # ax, ay, az 

@@ -38,8 +38,56 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         }.items(),
     )
 
+    _node_ekf_local = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='ekf_local',
+        output='screen',
+        parameters=[
+            os.path.join(orchard_slam_pkg_share, 'config/ekf_local.yaml'),
+            {'use_sim_time': use_sim_time},
+        ],
+        remappings=[
+            ('odometry/filtered', 'odometry/filtered/local'),
+        ],
+    )
+
+    _node_ekf_global = Node( 
+        package='robot_localization',
+        executable='ekf_node',
+        name='ekf_global',
+        output='screen',
+        parameters=[
+            os.path.join(orchard_slam_pkg_share, 'config/ekf_global.yaml'),
+            {'use_sim_time': use_sim_time},
+        ],
+        remappings=[
+            ('odometry/filtered', 'odometry/filtered/global'),
+        ],
+    )
+
+    _node_navsat_transform = Node(
+        package="robot_localization",
+        executable="navsat_transform_node",
+        name="navsat_transform",
+        output="log",
+        parameters=[
+            os.path.join(orchard_slam_pkg_share, 'config', 'navsat.yaml'),
+            {'use_sim_time': use_sim_time}
+        ],
+        remappings=[
+            # ('/imu', '/imu/data'),
+            # ('/gps/fix', '/gps/fix'),
+            ('/odometry/filtered', '/odometry/filtered/global'),
+        ],
+        arguments=['--ros-args', '--log-level', 'WARN'],
+    )
+
     _to_run = [
         _launch_slam_toolbox_lifelong,
+        _node_ekf_local,
+        _node_ekf_global,
+        _node_navsat_transform,
     ]
     return _to_run
 
