@@ -28,6 +28,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     launch_rviz = LaunchConfiguration("launch_rviz")
     launch_slam = LaunchConfiguration("launch_slam")
     world_sdf_file = LaunchConfiguration("world_sdf_file")
+    robot_x = LaunchConfiguration("robot_x")
+    robot_y = LaunchConfiguration("robot_y")
 
     # Gazebo-specific launch configurations 
     gazebo_headless = LaunchConfiguration("gazebo_headless")
@@ -94,6 +96,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
             "std_tree_spacing": std_tree_spacing,
             "std_row_deviation": std_row_deviation,
             "std_row_spacing": std_row_spacing,
+            "robot_x": robot_x,
+            "robot_y": robot_y,
         }.items(),
         condition=IfCondition(sim_gazebo),
     )
@@ -166,6 +170,8 @@ def generate_launch_description():
             description="Name of the world SDF file (without .sdf extension) to load in Gazebo",
             choices=["room", "small_orchard", "large_orchard"],
         ),
+        dict(name="robot_x", default_value="0.0", description="Initial x position of the robot in Gazebo (meters)"),
+        dict(name="robot_y", default_value="0.0", description="Initial y position of the robot in Gazebo (meters)"),
 
         # Gazebo-specific launch configs
         dict(name="gazebo_headless", default_value="false", choices=["true", "false"]),
