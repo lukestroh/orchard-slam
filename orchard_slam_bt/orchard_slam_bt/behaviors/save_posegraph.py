@@ -53,9 +53,9 @@ class SavePosegraphBehavior(pt.behaviour.Behaviour):
     def _srv_cb_save_map(self, future: Future):
         response: SerializePoseGraph.Response = future.result()
         if response.result == SerializePoseGraph.Response.RESULT_SUCCESS:
-            self.goal_status = pt.common.Status.SUCCESS
+            self.goal_status = True
         else:
-            self.goal_status = pt.common.Status.FAILURE
+            self.goal_status = False
         return
 
 

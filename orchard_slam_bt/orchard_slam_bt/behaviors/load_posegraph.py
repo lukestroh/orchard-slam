@@ -29,17 +29,22 @@ geometry_msgs/Pose2D initial_pose
 
 
 class LoadPosegraphBehavior(pt.behaviour.Behaviour):
-    def __init__(self, name: str, map_name: str, match_type: int = DeserializePoseGraph.Request.START_AT_FIRST_NODE, initial_pose: tuple = (0.0, 0.0, 0.0)):
+    def __init__(self, name: str, load_map: bool, map_name: str, match_type: int = DeserializePoseGraph.Request.START_AT_FIRST_NODE, initial_pose: tuple = (0.0, 0.0, 0.0)):
         super().__init__(name)
         self.name = name
+        self.load_map = load_map
         self.map_name = map_name
         self.match_type = match_type
         self.initial_pose = initial_pose
+        self.goal_status = None
         return
 
     def setup(self, node: LoggerNode,) -> bool:
         self.node = node
         self.node.info(f"Setting up {self.name}")
+        if not self.load_map:
+            self.goal_status = True
+            return True
 
         # Service clients
         self._srv_client_deserialize_map = self.node.create_client(
@@ -60,6 +65,8 @@ class LoadPosegraphBehavior(pt.behaviour.Behaviour):
         self.node.info(f"Requesting map load with name: {self.map_name}")
 
         map_name_abs_path = os.path.join(os.path.expanduser('~'), "orchard_slam_ws/src/orchard-slam/maps", self.map_name)
+        # slam_toolbox appends .posegraph/.data internally, so strip the extension if present
+        map_name_abs_path = map_name_abs_path.removesuffix('.posegraph')
 
         load_map_req = DeserializePoseGraph.Request()
         load_map_req.filename = map_name_abs_path
@@ -80,10 +87,19 @@ class LoadPosegraphBehavior(pt.behaviour.Behaviour):
     
     def _srv_cb_load_map(self, future: Future):
         response: DeserializePoseGraph.Response = future.result()
-        if response.result == DeserializePoseGraph.Response.RESULT_SUCCESS:
-            self.goal_status = pt.common.Status.SUCCESS
-            # Store the loaded map name on the blackboard for other behaviors to use
-            self.blackboard.set("map_name", self.map_name)
-        else:
-            self.goal_status = pt.common.Status.FAILURE
+        self.goal_status = True
+        # Store the loaded map name on the blackboard for other behaviors to use
+        self.blackboard.set("map_name", self.map_name)
+
         return
+    
+    def update(self) -> pt.common.Status:
+        if self.goal_status is not None:
+            if self.goal_status:
+                return pt.common.Status.SUCCESS
+            else:                
+                return pt.common.Status.FAILURE
+        else:
+            return pt.common.Status.RUNNING
+        
+    
