@@ -4,6 +4,13 @@ This is a set of ROS2 Kilted packages that allow a Farm-ng Amiga to navigate thr
 
 NOTE: Currently only developing for Gazebo.
 
+## Helpful CLI args:
+
+**Start the telop twist keyboard**
+```
+ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -p stamped:=true -r cmd_vel:=/diff_drive_controller/cmd_vel
+```
+
 ## Installation
 ### Installing `slam_toolbox`
 ```
@@ -31,7 +38,7 @@ rosdep install --from-paths src --ignore-src -r -y
 ## Launching the files
 To run the complete package, all launches should be run from the `orchard_slam_bringup` package.
 ```
-ros2 launch orchard_slam_bringup orchard_slam_brinup.launch.py
+ros2 launch orchard_slam_bringup orchard_slam_bringup.launch.py
 ```
 
 ## Package structure
