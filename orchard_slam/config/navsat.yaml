@@ -4,6 +4,7 @@ navsat_transform:
     frequency: 10.0
     delay: 0.0
     zero_altitude: true # set to false if you want to use altitude from GPS. This is often noisy and not needed for 2D navigation.
+    wait_for_datum: true # set to false if you want the node to start even if it doesn't have a GPS fix yet. If true, the node will wait until it receives a GPS fix before starting to publish transforms and odometry.
 
     publish_filtered_gps: true # set to false if you don't want the GPS position to be published as a nav_msgs/Odometry message
     broadcast_utm_transform: false # set to true if you want the node to broadcast a transform from the UTM frame to the base_link frame. This is often not needed if you are using a robot_localization EKF that can handle the GPS data directly.
@@ -12,7 +13,7 @@ navsat_transform:
     # Inputs
     gps_topic: /gps/fix
     imu_topic: /imu
-    odom_topic: /odometry/filtered/global
+    odom_topic: /odometry/filtered/local
 
     # Output
     output_topic: /odometry/gps

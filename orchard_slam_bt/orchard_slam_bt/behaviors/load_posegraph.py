@@ -4,6 +4,7 @@ from orchard_slam_bringup.logger_node import LoggerNode
 from rclpy.duration import Duration
 from rclpy.parameter import Parameter
 from rclpy.task import Future
+import rclpy
 
 from geometry_msgs.msg import Pose2D
 from sensor_msgs.msg import NavSatFix
@@ -100,8 +101,13 @@ class LoadPosegraphBehavior(pt.behaviour.Behaviour):
         return
     
     def _srv_cb_load_map(self, future: Future):
+        self.node.warn(self.goal_status)
+
         response: DeserializePoseGraph.Response = future.result()
+
         self.goal_status = True
+        self.node.warn(self.goal_status)
+
         # Store the loaded map name on the blackboard for other behaviors to use
         self.blackboard.set("map_name", self.map_name)
 
@@ -115,6 +121,9 @@ class LoadPosegraphBehavior(pt.behaviour.Behaviour):
     
     
     def update(self) -> pt.common.Status:
+        # Spin the node to process callbacks
+        rclpy.spin_once(self.node, timeout_sec=0)
+        
         if self.goal_status is not None:
             if self.goal_status:
                 return pt.common.Status.SUCCESS

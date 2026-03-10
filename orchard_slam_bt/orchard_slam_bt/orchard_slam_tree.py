@@ -102,6 +102,7 @@ class OrchardSlamTree(LoggerNode):
     def _sub_cb_gps(self, msg: NavSatFix):
         """Store the latest GPS reading on the blackboard for other behaviors to use"""
         self.blackboard.set("gps_filtered", msg)
+        return
 
     def _sub_cb_imu(self, msg: Imu):
         """Store the latest IMU reading on the blackboard for other behaviors to use"""
