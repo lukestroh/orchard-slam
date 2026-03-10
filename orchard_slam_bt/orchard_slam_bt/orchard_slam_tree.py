@@ -197,7 +197,15 @@ def main(args=None):
         stop_on_terminal_state=True,
     )
     try:
-        rclpy.spin(node)
+        while rclpy.ok() and node.tree.root.status not in [pt.common.Status.SUCCESS, pt.common.Status.FAILURE]:
+            rclpy.spin_once(node, timeout_sec=0.1)
+        
+        # Tree has reached terminal state
+        if node.tree.root.status == pt.common.Status.SUCCESS:
+            node.info("Behavior tree completed successfully.")
+        elif node.tree.root.status == pt.common.Status.FAILURE:
+            node.error("Behavior tree failed.")
+            
     except KeyboardInterrupt:
         node.info("Keyboard interrupt received, shutting down.")
     finally:
