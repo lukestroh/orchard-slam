@@ -1,7 +1,7 @@
 ekf_global:
   ros__parameters:
     two_d_mode: true
-    publish_tf: true
+    publish_tf: false
 
     base_link_frame: amiga__base
     world_frame: map
@@ -28,7 +28,7 @@ ekf_global:
 
     imu0: /imu
     imu0_config: [false, false, false, # x, y, z
-                  false, false, true, # roll, pitch, yaw
+                  false, false, true,  # roll, pitch, yaw
                   false, false, false, # vx, vy, vz
                   false, false, true,  # vroll, vpitch, vyaw
-                  true, true, false] # ax, ay, az 
+                  true, true, false]   # ax, ay, az 

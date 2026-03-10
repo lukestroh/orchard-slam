@@ -26,11 +26,11 @@ class RecordBagNode(LoggerNode):
         super().__init__(node_name="record_bag_node")
 
         # Parameters
-        self._param_record_bag = (
+        self.record_bag = (
             self.declare_parameter(name="record_bag", value=Parameter.Type.BOOL).get_parameter_value().bool_value
         )
-        self._param_record_loc = (
-            self.declare_parameter(name="record_loc", value=Parameter.Type.STRING).get_parameter_value().string_value
+        self.map_ = (
+            self.declare_parameter(name="map_name", value=Parameter.Type.STRING).get_parameter_value().string_value
         )
 
         # Callback groups
@@ -67,33 +67,33 @@ class RecordBagNode(LoggerNode):
         return
 
     def debug_timer_cb(self):
-        start_req = StartRecord.Request()
-        self.info(start_req.topics)
+        # start_req = StartRecord.Request()
+        # self.info(start_req.topics)
         return
 
     def _service_svr_cb_start_bag_record(self, request: StartRecord.Request, response: StartRecord.Response):
         # Subprocess requires relative path for bag creation
-        if self._param_record_bag:
+        if self.record_bag:
             cwd_path = os.getcwd()
             # _record_loc_str = request.record_loc # TODO: refactor away request info, just pass from launch not behavior
-            _record_loc_str = self._param_record_loc
+            _map_name_str = self.map_name
 
-            if _record_loc_str != "":
-                _record_loc = _record_loc_str + "__"
+            if _map_name_str != "":
+                _map_name = _map_name_str + "__"
             else:
-                _record_loc = _record_loc_str
+                _map_name = _map_name_str
 
             if request.output_dir != "":
                 _filepath_bag = os.path.join(
                     os.path.expanduser(request.output_dir),
-                    f"bds__{_record_loc}{dt.datetime.strftime(dt.datetime.now(), format=r'%Y%m%d_%H-%M-%S')}",
+                    f"orchard_slam__{_map_name}{dt.datetime.strftime(dt.datetime.now(), format=r'%Y%m%d_%H-%M-%S')}",
                 )
             else:
                 _filepath_bag = os.path.join(
                     os.path.expanduser("~"),
-                    "branch_detection_ws",
-                    "bags",
-                    f"bds__{_record_loc}{dt.datetime.strftime(dt.datetime.now(), format=r'%Y%m%d_%H-%M-%S')}",
+                    "orchard_slam_ws",
+                    "data",
+                    f"orchard_slam__{_map_name}{dt.datetime.strftime(dt.datetime.now(), format=r'%Y%m%d_%H-%M-%S')}",
                 )
             # Absolute path for the publisher
             abs_path = os.path.abspath(_filepath_bag)

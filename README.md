@@ -1,14 +1,37 @@
 # Orchard Slam
 
-This is a set of ROS2 Kilted packages that allow a Farm-ng Amiga to navigate through an orchard.
+This is a set of ROS2 Humble packages that allow a Farm-ng Amiga to navigate through an orchard.
 
 NOTE: Currently only developing for Gazebo.
+
+## SLAM / sensor integration:
+```
+     IMU + Odom + GPS pose
+            │
+            ▼
+        ekf_local
+     (world_frame: odom)
+            │
+            ▼ /odometry/filtered + odom->base_link tf
+            │
+      slam_toolbox
+     (reads /scan + TF)
+            │
+            ▼ map->odom tf
+```
 
 ## Helpful CLI args:
 
 **Start the telop twist keyboard**
 ```
 ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -p stamped:=true -r cmd_vel:=/diff_drive_controller/cmd_vel
+```
+
+**Load map with robot at specific point**
+```
+ros2 launch orchard_slam_bringup orchard_slam_bringup.launch.py gazebo_headless:=false robot_x:=3.5 robot_y:=4.5
+
+ros2 launch orchard_slam_bt orchard_slam_bt.launch.py load_map:=true map_name:=orchard_map
 ```
 
 ## Installation

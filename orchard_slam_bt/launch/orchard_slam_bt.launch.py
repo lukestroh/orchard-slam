@@ -17,29 +17,32 @@ import datetime as dt
 
 def launch_setup(context: LaunchContext, *args, **kwargs):
     # Launch configurations
-    _map_name = LaunchConfiguration("map_name")
+    load_map = LaunchConfiguration("load_map")
+    map_name = LaunchConfiguration("map_name")
+    record_bag = LaunchConfiguration("record_bag")
     use_sim_time = LaunchConfiguration("use_sim_time")
 
     # Package directories
     orchard_slam_bt_pkg_share = get_package_share_directory("orchard_slam_bt")
 
-    map_name = _map_name.perform(context) + "_" + dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-
     # Nodes launching commands
-    _node_run_slam_tree = Node(
+    _node_orchard_slam_tree = Node(
         package="orchard_slam_bt",
-        executable="run_slam_tree",
-        name="run_slam_tree",
+        executable="orchard_slam_tree",
+        name="orchard_slam_tree",
         output="screen",
         emulate_tty=True,  #
         parameters=[
-            {"use_sim_time": use_sim_time},
-            {"map_name": map_name}
+            {"load_map": load_map},
+            {"map_name": map_name},
+            {"record_bag": record_bag},
+            # {"use_sim_time": use_sim_time},
+
         ]
     )
 
     _to_run = [
-        _node_run_slam_tree
+        _node_orchard_slam_tree
     ]
 
     return _to_run
@@ -47,8 +50,10 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
 
 def generate_launch_description():
     declared_configs = [
+        dict(name="load_map", default_value="false", description="Whether to load a map or not"),
         dict(name="map_name", default_value="orchard_map", description="Name of the map to save"),
-        dict(name="use_sim_time", default_value="false", description="Whether to use simulation time or not"),
+        dict(name="record_bag", default_value="false", description="Whether to record a rosbag or not"),
+        dict(name="use_sim_time", default_value="true", description="Whether to use simulation time or not"),
     ]
 
     declared_args = [DeclareLaunchArgument(**config) for config in declared_configs]

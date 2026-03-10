@@ -28,7 +28,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "run_slam_tree = orchard_slam_bt.run_slam_tree:main",
+            "orchard_slam_tree = orchard_slam_bt.orchard_slam_tree:main",
         ],
     },
 )
