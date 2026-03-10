@@ -16,7 +16,7 @@ ekf_local:
         publish_acceleration: true
 
         # Whether to broadcast the transformation over the /tf topic. Defaults to true if unspecified.
-        publish_tf: true
+        publish_tf: false
         # reset_on_time_jump: true
 
         # 1. Set the map_frame, odom_frame, and base_link frames to the appropriate frame names for your system.
@@ -40,12 +40,12 @@ ekf_local:
                       false, false, true,   # vroll, vpitch, vyaw
                       false, false, false]  # ax, ay, az
 
-        # odom1: /odometry/gps
-        # odom1_config: [true,  true,  false, # x, y, z
-        #             false, false, false,  # roll, pitch, yaw
-        #             false, false, false,  # vx, vy, vz
-        #             false, false, false,  # vroll, vpitch, vyaw
-        #             false, false, false]  # ax, ay, az
+        odom1: /odometry/gps
+        odom1_config: [true,  true,  false, # x, y, z
+                    false, false, false,  # roll, pitch, yaw
+                    false, false, false,  # vx, vy, vz
+                    false, false, false,  # vroll, vpitch, vyaw
+                    false, false, false]  # ax, ay, az
 
         imu0: /imu
         imu0_config: [false, false, false, # x, y, z
