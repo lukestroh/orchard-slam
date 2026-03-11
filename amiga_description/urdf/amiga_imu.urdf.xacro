@@ -44,6 +44,9 @@
         <visualize>false</visualize>
         <update_rate>100.0</update_rate>
         <imu>
+          <orientation_reference_frame>
+            <localization>ENU</localization>
+          </orientation_reference_frame>
           <angular_velocity>
             <x>
               <noise type="gaussian">
