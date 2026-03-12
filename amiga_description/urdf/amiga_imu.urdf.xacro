@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://ros.org">
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:macro name="imu" params="prefix imu_name parent_link">
 
@@ -51,19 +51,19 @@
             <x>
               <noise type="gaussian">
                 <mean>0.0</mean>
-                <stddev>0.009</stddev>
+                <stddev>0.000617</stddev>  <!-- ISM330DHCX: 5 mdps/√Hz * √50 Hz, converted to rad/s -->
               </noise>
             </x>
             <y>
               <noise type="gaussian">
                 <mean>0.0</mean>
-                <stddev>0.009</stddev>
+                <stddev>0.000617</stddev>
               </noise>
             </y>
             <z>
               <noise type="gaussian">
                 <mean>0.0</mean>
-                <stddev>0.009</stddev>
+                <stddev>0.000617</stddev>
               </noise>
             </z>
           </angular_velocity>
@@ -71,19 +71,19 @@
             <x>
               <noise type="gaussian">
                 <mean>0.0</mean>
-                <stddev>0.021</stddev>
+                <stddev>0.004162</stddev>  <!-- ISM330DHCX: 60 µg/√Hz * √50 Hz, converted to m/s² -->
               </noise>
             </x>
             <y>
               <noise type="gaussian">
                 <mean>0.0</mean>
-                <stddev>0.021</stddev>
+                <stddev>0.004162</stddev>
               </noise>
             </y>
             <z>
               <noise type="gaussian">
                 <mean>0.0</mean>
-                <stddev>0.021</stddev>
+                <stddev>0.004162</stddev>
               </noise>
             </z>
           </linear_acceleration>
