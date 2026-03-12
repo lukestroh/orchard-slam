@@ -1,10 +1,11 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://ros.org">
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:macro name="lidar" params="prefix lidar_name parent_link">
 
     <xacro:property name="lidar_mass" value="1.0"/>
     <xacro:property name="lidar_xyz" value="0.65 0 ${0.232/2}"/>
+    <!-- <xacro:property name='lidar_xyz' value='0.65 0 ${0.4}'/> -->
     <xacro:property name="lidar_rpy" value="0 0 0"/>
 
     <link name="${prefix}__${lidar_name}">
@@ -46,7 +47,7 @@
         <ray>
           <scan>
             <horizontal>
-              <samples>360</samples>
+              <samples>1080</samples> <!-- 1080 samples for 0.33 degree resolution over 360 degrees -->
               <resolution>1</resolution>
               <min_angle>-1.57079632679</min_angle>
               <max_angle>1.57079632679</max_angle>

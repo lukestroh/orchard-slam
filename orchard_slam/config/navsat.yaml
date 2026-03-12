@@ -4,6 +4,7 @@ navsat_transform:
     frequency: 10.0
     delay: 0.0
     zero_altitude: true # set to false if you want to use altitude from GPS. This is often noisy and not needed for 2D navigation.
+    datum: [44.567774396988014, -123.2748157518973, 0.0] # lat, long, yaw in radians. If not set, the node will use the first GPS fix as the datum.
     wait_for_datum: true # set to false if you want the node to start even if it doesn't have a GPS fix yet. If true, the node will wait until it receives a GPS fix before starting to publish transforms and odometry.
 
     publish_filtered_gps: true # set to false if you don't want the GPS position to be published as a nav_msgs/Odometry message
@@ -11,8 +12,8 @@ navsat_transform:
     broadcast_utm_transform_as_parent_frame: false # If true, navsat_transform_node will publish the utm->world_frame transform instead of the world_frame->utm transform. Note that for the transform to be published broadcast_utm_transform also has to be set to true.
 
     # Inputs
-    gps_topic: /gps/fix
-    imu_topic: /imu
+    gps_topic: /gps/fixed
+    imu_topic: /imu/fixed
     odom_topic: /odometry/filtered/local
 
     # Output
@@ -27,7 +28,8 @@ navsat_transform:
     use_odometry_yaw: false
 
     # Set these if you have a magnetometer / know declination & offsets.
-    magnetic_declination_radians: 0.0
+    magnetic_declination_radians: 0.2520255
+    utm_zone: 10T
     yaw_offset: 0.0
 
     transform_timeout: 0.2

@@ -1,0 +1,23 @@
+{
+  "location": {
+    "latitude": 44.567692992344774,
+    "longitude": -123.27487349510194,
+    "utm_zone": "10T"
+  },
+  "declination_values": {
+    "magnetic_declination_degrees": 14.44,
+    "grid_convergence_degrees": -0.19,
+    "magnetic_to_grid_correction_degrees": 14.629999999999999
+  },
+  "descriptions": {
+    "magnetic_declination": "Angle between True North and Magnetic North",
+    "grid_convergence": "Angle between True North and Grid North (UTM projection)",
+    "total_correction": "Correction needed to convert from Magnetic bearing to Grid bearing"
+  },
+  "formulas": {
+    "grid_bearing": "Grid Bearing = Magnetic Bearing - Magnetic Declination + Grid Convergence",
+    "simplified": "Grid Bearing = Magnetic Bearing + Total Correction"
+  },
+  "note": "Magnetic declination calculated using World Magnetic Model (WMM) via geomagnetism library. Grid convergence based on UTM projection. For precise navigation, consult official sources.",
+  "generated": "2026-03-11T21:25:09.416Z"
+}

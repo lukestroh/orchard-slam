@@ -47,7 +47,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     # Package directories
     gz_sim_pkg_share = get_package_share_directory("ros_gz_sim")
     orchard_slam_gazebo_pkg_share = get_package_share_directory("orchard_slam_gazebo")
-    gazebo_model_path = os.path.join(orchard_slam_gazebo_pkg_share, "models")
+    orchard_slam_sensors_pkg_share = get_package_share_directory("orchard_slam_sensors")
 
     # Environmental Variables
     _set_env_var_gz_sim_resource_path = SetEnvironmentVariable(
@@ -109,6 +109,31 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         name="static_tf_gps_frame_fix",
         arguments=["0", "0", "0", "0", "0", "0", "amiga__gps_link", "amiga/amiga__base/navsat_sensor"],
         output="screen",
+    )
+
+    _node_imu_covariance_fixer = Node( # this node subscribes to the raw IMU data from Gazebo, sets the covariance values to something non-zero, and republishes it. This is necessary because Gazebo IMU messages have all covariance values set to zero, which causes issues with many ROS nodes that expect non-zero covariance (e.g. EKFs)
+        package="orchard_slam_sensors",
+        executable="imu_covariance_fixer_node",
+        name="imu_covariance_fixer",
+        output="screen",
+    )
+    
+    # same for gps
+    _node_gps_covariance_fixer = Node(
+        package="orchard_slam_sensors",
+        executable="gps_covariance_fixer_node",
+        name="gps_covariance_fixer",
+        output="screen",
+    )
+
+    _delay_covariance_fixers_after_gz_launch = RegisterEventHandler(
+        event_handler=OnProcessStart(
+            target_action=_node_gz_ros2_bridge,
+            on_start=[TimerAction(
+                period=1.0,
+                actions=[_node_imu_covariance_fixer, _node_gps_covariance_fixer],
+            )],
+        )
     )
 
     _node_spawn_robot = Node(
@@ -178,6 +203,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     _to_run = [
         _set_env_var_gz_sim_resource_path,
         # _launch_gz_server,
+        _delay_covariance_fixers_after_gz_launch,
         _node_static_tf_gps_frame_fix,
         _launch_gz_sim,
         _node_gz_ros2_bridge,
@@ -189,8 +215,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
 def generate_launch_description():
     declared_configs = [
         dict(name="gazebo_headless", default_value="false", choices=["true", "false"]),
-        dict(name="world_sdf_file", default_value="small_orchard", choices=["room", "large_orchard", "small_orchard"]),
-        dict(name="orchard_name", default_value="small_orchard", description="Name of the orchard configuration to generate (without .yaml extension)"),
+        dict(name="world_sdf_file", default_value="orchard_template", choices=["orchard_template"]),
+        dict(name="orchard_name", default_value="orchard", description="Name of the orchard configuration to generate (without .yaml extension)"),
         dict(name="orchard_seed", default_value="12", description="Random seed for orchard generation"),
         dict(name="orchard_origin_offset", default_value="(2.0,2.0)", description="Offset of the orchard origin from the world origin (x,y)"),
         dict(name="tree_namespace", default_value="lpy", description="Namespace for all tree entities in Gazebo"),
