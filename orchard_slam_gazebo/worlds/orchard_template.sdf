@@ -1,5 +1,5 @@
 <sdf version='1.9'>
-  <world name='dynamic_orchard'>
+  <world name='orchard_template'>
     <physics name='1ms' type='ignored'>
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
@@ -9,6 +9,10 @@
     <plugin name='gz::sim::systems::UserCommands' filename='gz-sim-user-commands-system'/>
     <plugin name='gz::sim::systems::SceneBroadcaster' filename='gz-sim-scene-broadcaster-system'/>
     <plugin name='gz::sim::systems::Contact' filename='gz-sim-contact-system'/>
+    <plugin
+      filename="gz-sim-imu-system"
+      name="gz::sim::systems::Imu">
+    </plugin>
     <plugin
       filename="ignition-gazebo-sensors-system"
       name="ignition::gazebo::systems::Sensors">
@@ -24,8 +28,8 @@
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <world_frame_orientation>ENU</world_frame_orientation>
-      <latitude_deg>0</latitude_deg>
-      <longitude_deg>0</longitude_deg>
+      <latitude_deg>44.567774396988014</latitude_deg>
+      <longitude_deg>-123.27481575189738</longitude_deg>
       <elevation>0</elevation>
     </spherical_coordinates>
 
@@ -35,6 +39,7 @@
       <ambient>0.400000006 0.400000006 0.400000006 1</ambient>
       <background>0.699999988 0.699999988 0.699999988 1</background>
       <shadows>true</shadows>
+      <grid>true</grid>
     </scene>
     <model name='ground_plane'>
       <static>true</static>

@@ -166,9 +166,9 @@ def generate_launch_description():
         dict(name="launch_slam", default_value="true", choices=["true", "false"]),
         dict(
             name="world_sdf_file",
-            default_value="small_orchard",
+            default_value="orchard_template",
             description="Name of the world SDF file (without .sdf extension) to load in Gazebo",
-            choices=["room", "small_orchard", "large_orchard"],
+            choices=["orchard_template"],
         ),
         dict(name="robot_x", default_value="0.0", description="Initial x position of the robot in Gazebo (meters)"),
         dict(name="robot_y", default_value="0.0", description="Initial y position of the robot in Gazebo (meters)"),
@@ -179,19 +179,19 @@ def generate_launch_description():
 
         # Orchard generation launch configs
         dict(name="orchard_name", default_value="small_orchard", description="Name of the orchard configuration to generate (without .yaml extension)"),
-        dict(name="orchard_seed", default_value="12", description="Random seed for orchard generation"),
+        dict(name="orchard_seed", default_value="17", description="Random seed for orchard generation"),
         dict(name="orchard_origin_offset", default_value="(2.0,2.0)", description="Offset of the orchard origin from the world origin (x,y)"),
         dict(name="tree_namespace", default_value="lpy", description="Namespace for all tree entities in Gazebo"),
         dict(name="tree_type", default_value="envy", choices=['envy', 'ufo'], description="Type of tree to generate (e.g. apple, orange, etc.)"),
         dict(name="num_rows", default_value="5", description="Number of rows in the orchard"),
         dict(name="avg_trees_per_row", default_value="10", description="Average number of trees per row in the orchard"),
         dict(name="avg_tree_spacing", default_value="3.0", description="Average spacing between trees in the orchard (meters)"),
-        dict(name="std_trees_per_row", default_value="2.0", description="Standard deviation of number of trees per row in the orchard"),
+        dict(name="std_trees_per_row", default_value="0.5", description="Standard deviation of number of trees per row in the orchard"),
         dict(name="std_tree_spacing", default_value="1.0", description="Standard deviation of spacing between trees in the orchard (meters)"),
         dict(name="avg_row_deviation", default_value="0.2", description="Average deviation from straight rows in the orchard (meters)"),
         dict(name="std_row_deviation", default_value="0.1", description="Standard deviation of row deviation in the orchard (meters)"),
         dict(name="avg_row_spacing", default_value="5.0", description="Average spacing between rows in the orchard (meters)"),
-        dict(name="std_row_spacing", default_value="0.5", description="Standard deviation of row spacing in the orchard (meters)"),
+        dict(name="std_row_spacing", default_value="0.25", description="Standard deviation of row spacing in the orchard (meters)"),
     ]
 
     declared_args = [DeclareLaunchArgument(**config) for config in declared_configs]
