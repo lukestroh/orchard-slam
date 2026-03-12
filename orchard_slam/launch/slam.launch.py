@@ -50,6 +50,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         remappings=[
             ('odometry/filtered', 'odometry/filtered/local'),
         ],
+        arguments=['--ros-args', '--log-level', 'WARN'],
     )
 
     # _node_ekf_global = Node( 
@@ -80,7 +81,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
             # ('/gps/fix', '/gps/fix'),
             ('/odometry/filtered', '/odometry/filtered/local'),
         ],
-        arguments=['--ros-args', '--log-level', 'WARN'],
+        # arguments=['--ros-args', '--log-level', 'WARN'],
     )
 
     _to_run = [
