@@ -45,7 +45,7 @@
         <update_rate>100.0</update_rate>
         <imu>
           <orientation_reference_frame>
-            <localization>ENU</localization>
+            <localization>ENU</localization> <!--xyz as east-north-up -->
           </orientation_reference_frame>
           <angular_velocity>
             <x>
