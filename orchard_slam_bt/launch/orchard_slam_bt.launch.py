@@ -10,7 +10,9 @@ from launch.substitutions import (
 from launch_ros.actions import Node
 
 import rclpy.logging
-logger = rclpy.logging.get_logger('bt_orchard_slam.launch')
+
+logger = rclpy.logging.get_logger("bt_orchard_slam.launch")
+# logger.set_level(rclpy.logging.LoggingSeverity.WARN)
 
 import datetime as dt
 
@@ -21,6 +23,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     map_name = LaunchConfiguration("map_name")
     record_bag = LaunchConfiguration("record_bag")
     use_sim_time = LaunchConfiguration("use_sim_time")
+    initial_start_pose = LaunchConfiguration("initial_start_pose")
 
     # Package directories
     orchard_slam_bt_pkg_share = get_package_share_directory("orchard_slam_bt")
@@ -35,15 +38,13 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         parameters=[
             {"load_map": load_map},
             {"map_name": map_name},
+            {"initial_start_pose": initial_start_pose},
             {"record_bag": record_bag},
             # {"use_sim_time": use_sim_time},
-
-        ]
+        ],
     )
 
-    _to_run = [
-        _node_orchard_slam_tree
-    ]
+    _to_run = [_node_orchard_slam_tree]
 
     return _to_run
 
@@ -51,6 +52,11 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
 def generate_launch_description():
     declared_configs = [
         dict(name="load_map", default_value="false", description="Whether to load a map or not"),
+        dict(
+            name="initial_start_pose",
+            default_value="",
+            description="Initial pose to start at if loading a map (x, y, theta) in map frame",
+        ),
         dict(name="map_name", default_value="orchard_map", description="Name of the map to save"),
         dict(name="record_bag", default_value="false", description="Whether to record a rosbag or not"),
         dict(name="use_sim_time", default_value="true", description="Whether to use simulation time or not"),
