@@ -15,6 +15,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Tree.msg"
   "msg/OrchardRow.msg"
   "msg/Orchard.msg"
+  "msg/OrchardNavStatus.msg"
+  "action/StartOrchardNavigation.action"
   DEPENDENCIES std_msgs geometry_msgs
 )
 
