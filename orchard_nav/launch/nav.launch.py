@@ -1,57 +1,55 @@
 import launch
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch import LaunchDescription, LaunchContext
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch.actions import SetEnvironmentVariable
 
-def generate_launch_description():
-    # Get the path to the params and launch directories of your packages
-    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
-    orchard_navigation_share_dir = get_package_share_directory('orchard_nav')
-    nav2_launch_file_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
-    param_dir = LaunchConfiguration(
-        'params',
-        default=os.path.join(orchard_navigation_share_dir, 'params', 'nav2_params.yaml')
+import rclpy.logging
+
+logger = rclpy.logging.get_logger("orchard_nav.launch")
+
+
+def launch_setup(context: LaunchContext, *args, **kwargs):
+    # Launch configurations
+    use_sim_time = LaunchConfiguration("use_sim_time")
+
+    # Package shares
+    orchard_navigation_share_dir = get_package_share_directory("orchard_nav")
+    nav2_bringup_share_dir = get_package_share_directory("nav2_bringup")
+
+    # Include the Nav2 bringup launch file for the navigation stack
+    _launch_nav2_bringup = IncludeLaunchDescription(
+        AnyLaunchDescriptionSource(os.path.join(nav2_bringup_share_dir, "launch", "navigation_launch.py")),
+        launch_arguments={
+            "use_sim_time": use_sim_time,
+            "params_file": os.path.join(orchard_navigation_share_dir, "config", "nav2_params.yaml"),
+        }.items(),
     )
 
-    # Declare the launch arguments
-    return LaunchDescription([
-        SetEnvironmentVariable('RCUTILS_LOGGING_SEVERITY', 'DEBUG'), 
+    _node_orchard_nav = Node(
+        package="orchard_nav",
+        executable="orchard_nav",
+        name="orchard_nav",
+        output="screen",
+        parameters=[{"use_sim_time": use_sim_time}],
+    )
 
-        # Use simulation time (for Gazebo)
-        DeclareLaunchArgument(
-            'use_sim_time',
-            default_value='true',
-            description='Use simulation (Gazebo) clock if true'
-        ),
-        
-        # Parameter file to be loaded
-        DeclareLaunchArgument(
-            'params_file',
-            default_value=param_dir,
-            description='Full path to parameter file to load'
-        ),
+    _to_run = [_launch_nav2_bringup, _node_orchard_nav]
+    return _to_run
 
-        # Include the Nav2 bringup launch file for the navigation stack
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([nav2_launch_file_dir, '/navigation_launch.py']),
-            launch_arguments={
-                'use_sim_time': use_sim_time,
-                'params_file': param_dir
-            }.items(),
-        ),
 
-        # Launch the robot behavior node (if you have a custom robot behavior script)
-        # Node(
-        #     package='orchard_nav',
-        #     executable='robot_behavior',
-        #     name='robot_behavior',
-        #     output='screen',
-        #     parameters=[{'use_sim_time': use_sim_time}],
-        # ),
+def generate_launch_description():
+    # Get the path to the params and launch directories of your packages
+    declared_configs = [
+        dict(name="use_sim_time", default_value="true", description="Use simulation (Gazebo) clock if true"),
+    ]
 
-    ])
+    declared_args = [DeclareLaunchArgument(**config) for config in declared_configs]
+
+    ld = LaunchDescription(declared_args + [OpaqueFunction(function=launch_setup)])
+
+    return ld
