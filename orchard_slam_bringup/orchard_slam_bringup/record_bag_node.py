@@ -116,7 +116,7 @@ class RecordBagNode(LoggerNode):
                 ],
                 stderr=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                preexec_fn=os.setsid
+                preexec_fn=os.setsid,
             )
             response.success = True
         else:
@@ -134,14 +134,14 @@ class RecordBagNode(LoggerNode):
                 # self.bag_process.terminate()
                 os.killpg(os.getpgid(self.bag_process.pid), signal.SIGTERM)
                 ret_code = self.bag_process.wait()
-                
+
             if ret_code == 0:
                 response.success = True
             else:
                 response.success = False
         else:
             response.success = False
-            
+
         return response
 
 
