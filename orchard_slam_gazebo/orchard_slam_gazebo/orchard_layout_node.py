@@ -39,13 +39,11 @@ class OrchardLayoutNode(TFNode):
         """
 
         # Parameters
-        _params = {
-            "orchard_config": Parameter.Type.STRING
-        }
+        _params = {"orchard_config": Parameter.Type.STRING}
         self.declare_parameter_dict(_params)
         orchard_config_str = self.get_param_value(key="orchard_config")
         self.orchard_config = json.loads(orchard_config_str)
-        
+
         # QoS profiles
         self._qos_orchard_config = QoSProfile(
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
@@ -66,7 +64,7 @@ class OrchardLayoutNode(TFNode):
         )
 
         return
-    
+
     def _timer_cb_pub_orchard_config(self):
         orchard_msg = Orchard()
         orchard_msg.orchard_seed = self.orchard_config["orchard_seed"]
@@ -91,7 +89,6 @@ class OrchardLayoutNode(TFNode):
             row_msg = OrchardRow()
             row_msg.row_id = row["row_id"]
             row_msg.n_trees = row["num_trees"]
-            
 
             for tree in row["trees"]:
                 tree_msg = Tree()
@@ -105,10 +102,9 @@ class OrchardLayoutNode(TFNode):
         # Publish the message
         self._pub_orchard_config.publish(orchard_msg)
 
-        self._timer_pub_orchard_config.cancel() # Only publish once
+        self._timer_pub_orchard_config.cancel()  # Only publish once
         return
 
-    
 
 def main():
     rclpy.init()

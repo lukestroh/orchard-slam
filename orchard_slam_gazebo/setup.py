@@ -21,7 +21,7 @@ _data_files = [
 # Keep file structures for meshes
 for file in mesh_files:
     relative_path = os.path.relpath(file, meshes_relative_base_path)
-    install_path = os.path.join('share', package_name, meshes_relative_base_path, os.path.dirname(relative_path))
+    install_path = os.path.join("share", package_name, meshes_relative_base_path, os.path.dirname(relative_path))
     _data_files.append((install_path, [file]))
 
 
