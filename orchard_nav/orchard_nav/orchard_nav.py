@@ -18,6 +18,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from orchard_slam_bringup.logger_node import LoggerNode
 from orchard_nav.nav_state import OrchardNavState
 from orchard_nav import orchard_row as ochr
+from orchard_nav import tree_detection as ochtd
 
 import numpy as np
 from threading import Lock
@@ -173,7 +174,7 @@ class OrchardNav(LoggerNode):
         # State variables
         self.nav_state = OrchardNavState.IDLE
         self.goal_pose = None
-        self.robot_facing = None
+        self.robot_yaw = None
         self.row_detected = False
         return
 
@@ -182,7 +183,7 @@ class OrchardNav(LoggerNode):
         self._msg_robot_pose = msg
         robot_pose = self._msg_robot_pose.pose.pose
         self.robot_pose = robot_pose
-        self.robot_facing = np.arctan2(self.robot_pose.orientation.z, self.robot_pose.orientation.w) * 2.0
+        self.robot_yaw = np.arctan2(self.robot_pose.orientation.z, self.robot_pose.orientation.w) * 2.0
 
         return
 
@@ -229,14 +230,6 @@ class OrchardNav(LoggerNode):
         self._msg_initial_start_pose = msg
         return
     
-    def _action_goal_cb_explore(self, goal_handle):
-        self.get_logger().info("Received explore goal request")
-        return GoalResponse.ACCEPT
-    
-    def _action_cancel_cb_explore(self, goal_handle):
-        self.get_logger().info("Received explore goal cancel request")
-        return CancelResponse.ACCEPT
-    
     def _action_exec_cb_explore(self, goal_handle: ServerGoalHandle):
         """Execute the explore behavior"""
         _result = StartOrchardNavigation.Result()
@@ -264,22 +257,6 @@ class OrchardNav(LoggerNode):
         _result.message = "Explore behavior completed successfully."
         goal_handle.succeed()
         return _result
-
-    def _action_goal_cb_turn_row(self, goal_handle):
-        self.get_logger().info("Received turn_row goal request")
-        return GoalResponse.ACCEPT
-    
-    def _action_cancel_cb_turn_row(self, goal_handle):
-        self.get_logger().info("Received turn_row goal cancel request")
-        return CancelResponse.ACCEPT
-    
-    def _action_goal_cb_return_home(self, goal_handle):
-        self.get_logger().info("Received return_home goal request")
-        return GoalResponse.ACCEPT
-    
-    def _action_cancel_cb_return_home(self, goal_handle):
-        self.get_logger().info("Received return_home goal cancel request")
-        return CancelResponse.ACCEPT
     
     def _action_exec_cb_return_home(self, goal_handle: ServerGoalHandle):
         """Execute the return_home behavior"""
@@ -312,7 +289,7 @@ class OrchardNav(LoggerNode):
         # turn in place until facing down the next row, then succeed the goal. Timeout after 10s if not facing row
         start_time = self.get_clock().now()
         while self._msg_orchard_nav_status.nav_state == OrchardNavState.TURN_ROW:
-            if self.row_detected and self.robot_facing is not None and abs(self.robot_facing) < np.pi / 4:
+            if self.row_detected and self.robot_yaw is not None and abs(self.robot_yaw) < np.pi / 4:
                 self.info("Successfully turned into the next row! Succeeding turn_row goal.")
                 break
             if (self.get_clock().now() - start_time).nanoseconds > 10 * 1e9:  # 10 second timeout
@@ -326,14 +303,6 @@ class OrchardNav(LoggerNode):
         _result.message = "Turn row behavior completed successfully."
         goal_handle.succeed()
         return _result
-    
-    def _action_goal_cb_traverse_row(self, goal_handle):
-        self.get_logger().info("Received navigation goal request")
-        return GoalResponse.ACCEPT
-
-    def _action_cancel_cb_traverse_row(self, goal_handle):
-        self.get_logger().info("Received navigation goal cancel request")
-        return CancelResponse.ACCEPT
 
     def _action_exec_cb_traverse_row(self, goal_handle: ServerGoalHandle):
         """Get the goal"""
@@ -341,32 +310,57 @@ class OrchardNav(LoggerNode):
         _result = StartOrchardNavigation.Result()
 
         while self._msg_orchard_nav_active_state.nav_state == OrchardNavState.TRAVERSE_ROW.value:
-            # goal_reached = self.check_if_goal_reached()
-            # if self.check_if_goal_reached():
-            #     self.get_logger().info("Goal reached! Choosing a new goal...")
-            #     self.choose_goal()
             with self._lock_local_costmap:
                 local_costmap = self._msg_local_costmap
             with self._lock_global_costmap:
                 global_costmap = self._msg_global_costmap
+
+            # check if still in row
+            ...
+            # need to find a way to detect if we've been in all rows. 
+            # look to see if there was another line of trees that we haven't traversed yet. We can detect
+            # rows over that have been seen by the lidar. for realistic lidar, we should probably extend the range.
+            # This means we need a dynamically growing history of rows seen
+            # Plan:
+            # 1. when the end of a row is detected, consult global costmap to map out all orchard rows using same ransac method. store and label rows (create Row message as well, let BT subscribe).
+            # 2.  calculate which row we're in based on current robot position. store current row id on blackboard (actually, do this last one when entering a new row.)
+            # 3. assess whether the next row has been seen. if so, turn towards it.
+            # 4. if starting in the middle of the orchard and both sides are equivalent, randomly pick one.
+            # 5. if it's the first or last row in an orchard, we should try to map both sides of the row. This
+            # isn't a problem for the local navigation with the local costmap, but we need better logic for 
+            # turning / detecting "in-row" when on the edge of an orchard.
+            # 6. when done, be sure to set mapping_complete on blackboard so robot can go home. we probably also need
+            # a termination topic/blackboard var
+
             
         
             obstacle_positions = self.get_obstacle_positions(costmap=local_costmap)
             rows = ochr.detect_orchard_rows(
                 obstacle_positions=obstacle_positions,
                 inlier_threshold=0.2,  # m distance threshold for inliers
-                min_inliers=10,       # Minimum 10 inliers to consider a valid row
+                min_inliers=10,       # minimum 10 inliers to consider a valid row
                 max_iterations=100,   # RANSAC iterations
-                min_row_separation=1.5  # Minimum distance between rows
+                min_row_separation=1.5  # meter distance between rows
             )
+            if not rows:
+                continue
             # self.warn(rows)
             self.publish_row_markers(rows=rows)
-            # self.warn(tree_positions)
-            # if tree_positions:
-            #     goal = self.choose_goal()
-            #     self.info(f"{goal}")
+            goal = ochtd.get_row_goal(rows=rows, robot_pose=self.robot_pose, robot_heading=self.robot_yaw)
+            self.warn(goal)
+            goal_msg = PoseStamped()
+            goal_msg.header.frame_id = "map"
+            goal_msg.header.stamp = self.get_clock().now().to_msg()
+            goal_msg.pose.position.x = float(goal[0][0])
+            goal_msg.pose.position.y = float(goal[0][1])
+            goal_msg.pose.position.z = 0.0
+            qx, qy, qz, qw = ochtd.yaw_to_quat(goal[1])
+            goal_msg.pose.orientation.x = qx
+            goal_msg.pose.orientation.y = qy
+            goal_msg.pose.orientation.z = qz
+            goal_msg.pose.orientation.w = qw
+            self._pub_goal_pose.publish(goal_msg)
 
-            in_row = self.in_row(local_costmap.data)
             self.get_clock().sleep_for(rclpy.duration.Duration(seconds=0.1))
 
 
@@ -588,6 +582,33 @@ class OrchardNav(LoggerNode):
         c.b = 0.0
         return c
 
+
+        def _action_goal_cb_explore(self, goal_handle):
+        self.get_logger().info("Received explore goal request")
+        return GoalResponse.ACCEPT
+    
+    
+    def _action_goal_cb_turn_row(self, goal_handle):
+        self.get_logger().info("Received turn_row goal request")
+        return GoalResponse.ACCEPT
+    def _action_cancel_cb_return_home(self, goal_handle):
+        self.get_logger().info("Received return_home goal cancel request")
+        return CancelResponse.ACCEPT
+    def _action_cancel_cb_explore(self, goal_handle):
+        self.get_logger().info("Received explore goal cancel request")
+        return CancelResponse.ACCEPT
+    def _action_cancel_cb_turn_row(self, goal_handle):
+        self.get_logger().info("Received turn_row goal cancel request")
+        return CancelResponse.ACCEPT
+    def _action_goal_cb_return_home(self, goal_handle):
+        self.get_logger().info("Received return_home goal request")
+        return GoalResponse.ACCEPT
+    def _action_goal_cb_traverse_row(self, goal_handle):
+        self.get_logger().info("Received navigation goal request")
+        return GoalResponse.ACCEPT
+    def _action_cancel_cb_traverse_row(self, goal_handle):
+        self.get_logger().info("Received navigation goal cancel request")
+        return CancelResponse.ACCEPT
 def main(args=None):
     rclpy.init(args=args)
     node = OrchardNav()
