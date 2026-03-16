@@ -2,20 +2,22 @@ import rclpy
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
+from rclpy.duration import Duration
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.parameter import Parameter
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
-from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
-from sensor_msgs.msg import LaserScan
 
-from nav_msgs.msg import OccupancyGrid, Odometry
-from nav2_msgs.action import NavigateToPose
+from geometry_msgs.msg import Point, PoseStamped, Twist, TwistStamped
 from orchard_msgs.action import StartOrchardNavigation
 from orchard_msgs.msg import OrchardNavState as OrchardNavStateMsg
-from geometry_msgs.msg import Pose, PoseStamped
+from nav_msgs.msg import OccupancyGrid, Odometry
+from sensor_msgs.msg import LaserScan
+from std_msgs.msg import ColorRGBA
+from visualization_msgs.msg import Marker, MarkerArray
 
 from orchard_slam_bringup.logger_node import LoggerNode
 from orchard_nav.nav_state import OrchardNavState
+from orchard_nav import orchard_row as ochr
 
 import numpy as np
 from threading import Lock
@@ -27,6 +29,7 @@ class OrchardNav(LoggerNode):
 
         # locks
         self._lock_local_costmap = Lock()
+        self._lock_global_costmap = Lock()
 
         # Callback groups
         self._cb_group_reentrant = ReentrantCallbackGroup()
@@ -64,6 +67,20 @@ class OrchardNav(LoggerNode):
             callback_group=self._cb_group_reentrant,
             qos_profile=10,
         )
+        self._sub_global_costmap = self.create_subscription(
+            msg_type=OccupancyGrid,
+            topic="/global_costmap/costmap",
+            callback=self._sub_cb_global_costmap,
+            callback_group=self._cb_group_reentrant,
+            qos_profile=10,
+        )
+        self._sub_map = self.create_subscription(
+            msg_type=OccupancyGrid,
+            topic="/map",
+            callback=self._sub_cb_map,
+            callback_group=self._cb_group_reentrant,
+            qos_profile=10,
+        )
         self._sub_odom = self.create_subscription(
             msg_type=Odometry,
             topic="/odometry/filtered/local",
@@ -97,6 +114,12 @@ class OrchardNav(LoggerNode):
             topic="/goal_pose",
             callback_group=self._cb_group_reentrant,
             qos_profile=self._qos_goal_pose,
+        )
+        self._pub_detected_row_markers = self.create_publisher(
+            msg_type=MarkerArray,
+            topic="/orchard_nav/detected_row_markers",
+            callback_group=self._cb_group_reentrant,
+            qos_profile=10,
         )
 
         # Action servers
@@ -183,6 +206,17 @@ class OrchardNav(LoggerNode):
         """Callback for local costmap data"""
         with self._lock_local_costmap:
             self._msg_local_costmap = msg
+        return
+    
+    def _sub_cb_map(self, msg: OccupancyGrid):
+        """Callback for map data"""
+        self._msg_occupancy_grid = msg
+        return
+    
+    def _sub_cb_global_costmap(self, msg: OccupancyGrid):
+        """Callback for global costmap data"""
+        with self._lock_global_costmap:
+            self._msg_global_costmap = msg
         return
 
     def _sub_cb_orchard_nav_active_state(self, msg: OrchardNavStateMsg):
@@ -313,15 +347,27 @@ class OrchardNav(LoggerNode):
             #     self.choose_goal()
             with self._lock_local_costmap:
                 local_costmap = self._msg_local_costmap
+            with self._lock_global_costmap:
+                global_costmap = self._msg_global_costmap
+            
         
-            tree_positions = self.get_tree_positions(local_costmap)
+            obstacle_positions = self.get_obstacle_positions(costmap=local_costmap)
+            rows = ochr.detect_orchard_rows(
+                obstacle_positions=obstacle_positions,
+                inlier_threshold=0.2,  # m distance threshold for inliers
+                min_inliers=10,       # Minimum 10 inliers to consider a valid row
+                max_iterations=100,   # RANSAC iterations
+                min_row_separation=1.5  # Minimum distance between rows
+            )
+            # self.warn(rows)
+            self.publish_row_markers(rows=rows)
             # self.warn(tree_positions)
             # if tree_positions:
             #     goal = self.choose_goal()
             #     self.info(f"{goal}")
 
             in_row = self.in_row(local_costmap.data)
-            self.warn(f"in_row: {in_row}")
+            self.get_clock().sleep_for(rclpy.duration.Duration(seconds=0.1))
 
 
 
@@ -358,45 +404,48 @@ class OrchardNav(LoggerNode):
         )
         return distance < 0.2  # Consider goal reached if within 20 cm
 
-    def get_tree_positions(self, local_costmap):
-        """Identify tree positions by clustering occupied cells in the window map"""
+    def get_obstacle_positions(
+        self,
+        costmap,
+        occupancy_threshold: int = 65,
+        voxel_size: float = 0.1,
+    ) -> list[tuple[float, float]]:
+        """
+        Extract occupied cell positions from a Nav2 costmap and return them
+        in map frame coordinates, downsampled using a voxel grid filter.
 
-        if local_costmap is None or self.robot_pose is None:
+        :param costmap: nav2_msgs/Costmap or OccupancyGrid message
+        :param occupancy_threshold: cells at or above this value are considered obstacles.
+            Nav2 costmap uses 0-254 scale (65 ~ inscribed, 253 = inscribed radius, 254 = lethal).
+            Raw OccupancyGrid uses 0-100.
+        :param voxel_size: spatial bin size (metres) for voxel grid downsampling.
+            One point is kept per voxel, giving even spatial coverage regardless of
+            cluster density. Should be >= costmap resolution.
+        :returns: list of (x, y) tuples in map frame (metres)
+        """
+        if costmap is None or self.robot_pose is None:
             return []
-        
-        tree_positions = []
-        visited = set()
-        grid_width = int(local_costmap.info.width)
 
-        # Simple clustering: find connected occupied cells in window_map
-        for idx, cell in enumerate(local_costmap.data):
-            if cell > 50 and idx not in visited:  # Occupied cell
-                # BFS to find connected cluster
-                cluster = []
-                queue = [idx]
-                visited.add(idx)
+        info = costmap.info
+        origin_x = info.origin.position.x
+        origin_y = info.origin.position.y
+        resolution = info.resolution
+        width = info.width
+        height = info.height
 
-                while queue:
-                    current_idx = queue.pop(0)
-                    cluster.append(current_idx)
+        data = np.array(costmap.data, dtype=np.int16).reshape((height, width))
+        rows, cols = np.where(data >= occupancy_threshold)
 
-                    # Check neighbors (4-connectivity)
-                    for neighbor_idx in self._get_neighbors(current_idx, grid_width, local_costmap.data):
-                        if (
-                            neighbor_idx not in visited
-                            and 0 <= neighbor_idx < len(local_costmap.data)
-                            and local_costmap.data[neighbor_idx] > 50
-                        ):
-                            visited.add(neighbor_idx)
-                            queue.append(neighbor_idx)
+        # Convert to map frame
+        map_x = origin_x + (cols + 0.5) * resolution
+        map_y = origin_y + (rows + 0.5) * resolution
+        points = np.column_stack((map_x, map_y))
 
-                # Calculate cluster centroid as tree position
-                if cluster:
-                    avg_x = sum(idx % grid_width for idx in cluster) / len(cluster)
-                    avg_y = sum(idx // grid_width for idx in cluster) / len(cluster)
-                    tree_positions.append((avg_x, avg_y))
+        # Voxel grid: assign each point to a bin, keep one point per bin
+        voxel_indices = np.floor(points / voxel_size).astype(np.int32)
+        _, unique_indices = np.unique(voxel_indices, axis=0, return_index=True)
 
-        return tree_positions
+        return [tuple(p) for p in points[unique_indices]]
 
     def _get_neighbors(self, idx, width, map_data):
         """Get indices of 4-connected neighbors"""
@@ -418,6 +467,126 @@ class OrchardNav(LoggerNode):
         """Logic to choose a new goal based on sensor data and map"""
         return
 
+    def publish_row_markers(
+        self,
+        rows: list,
+        line_half_length: float = 4.0,
+        max_residual: float = 0.5,
+        lifetime_sec: float = 1.0,
+    ):
+        """
+        Publish RViz markers for detected orchard rows. Each row produces three
+        markers: a line strip showing the fitted row, an arrow showing direction,
+        and a cylinder whose diameter encodes the fit residual.
+
+        :param rows: list of OrchardRow from detect_orchard_rows()
+        :param marker_pub: rclpy Publisher for visualization_msgs/MarkerArray
+        :param line_half_length: metres to extend the line either side of the row centroid
+        :param max_residual: residual (metres) at which the color saturates to full red
+        :param lifetime_sec: marker lifetime in seconds; set to 0 for persistent
+        """
+        marker_array = MarkerArray()
+        stamp = self.get_clock().now().to_msg()
+        lifetime = Duration(seconds=1.0).to_msg()
+
+
+        # Delete all previous markers in the namespace before redrawing
+        delete_all = Marker()
+        delete_all.action = Marker.DELETEALL
+        marker_array.markers.append(delete_all)
+
+        for row_idx, row in enumerate(rows):
+            color = self._residual_color(row.residual, max_residual)
+            base_id = row_idx * 3  # 3 markers per row: 0=line, 1=arrow, 2=cylinder
+
+            p = row.point        # (2,) centroid
+            d = row.direction    # (2,) unit vector
+
+            # --- LINE STRIP: fitted row axis ---
+            line_marker = Marker()
+            line_marker.header.frame_id = "map"
+            line_marker.header.stamp = stamp
+            line_marker.ns = "orchard_rows"
+            line_marker.id = base_id
+            line_marker.type = Marker.LINE_STRIP
+            line_marker.action = Marker.ADD
+            line_marker.lifetime = lifetime
+            line_marker.scale.x = 0.05  # line width (metres)
+            line_marker.color = color
+
+            start = Point(x=float(p[0] - d[0] * line_half_length),
+                        y=float(p[1] - d[1] * line_half_length), z=0.0)
+            end   = Point(x=float(p[0] + d[0] * line_half_length),
+                        y=float(p[1] + d[1] * line_half_length), z=0.0)
+            line_marker.points = [start, end]
+            marker_array.markers.append(line_marker)
+
+            # # --- ARROW: direction indicator at centroid ---
+            # arrow_marker = Marker()
+            # arrow_marker.header.frame_id = "map"
+            # arrow_marker.header.stamp = stamp
+            # arrow_marker.ns = "orchard_rows"
+            # arrow_marker.id = base_id + 1
+            # arrow_marker.type = Marker.ARROW
+            # arrow_marker.action = Marker.ADD
+            # arrow_marker.lifetime = lifetime
+            # arrow_marker.scale.x = 0.6   # shaft length
+            # arrow_marker.scale.y = 0.1   # shaft diameter
+            # arrow_marker.scale.z = 0.15  # head diameter
+            # arrow_marker.color = color
+
+            # arrow_tail = Point(x=float(p[0]), y=float(p[1]), z=0.05)
+            # arrow_head = Point(x=float(p[0] + d[0] * 0.6),
+            #                 y=float(p[1] + d[1] * 0.6), z=0.05)
+            # arrow_marker.points = [arrow_tail, arrow_head]
+            # marker_array.markers.append(arrow_marker)
+
+            # # --- CYLINDER: residual indicator at centroid ---
+            # cyl_marker = Marker()
+            # cyl_marker.header.frame_id = "map"
+            # cyl_marker.header.stamp = stamp
+            # cyl_marker.ns = "orchard_rows"
+            # cyl_marker.id = base_id + 2
+            # cyl_marker.type = Marker.CYLINDER
+            # cyl_marker.action = Marker.ADD
+            # cyl_marker.lifetime = lifetime
+            # diameter = float(np.clip(row.residual * 4.0, 0.05, 1.0))  # scale for visibility
+            # cyl_marker.scale.x = diameter
+            # cyl_marker.scale.y = diameter
+            # cyl_marker.scale.z = 0.1    # flat disc
+            # cyl_marker.pose.position.x = float(p[0])
+            # cyl_marker.pose.position.y = float(p[1])
+            # cyl_marker.pose.position.z = 0.0
+            # cyl_marker.pose.orientation.w = 1.0
+            # cyl_marker.color = color
+            # marker_array.markers.append(cyl_marker)
+
+        self._pub_detected_row_markers.publish(marker_array)
+        return
+    
+    def _residual_color(self, residual: float, max_residual: float = 0.5) -> ColorRGBA:
+        """
+        Map residual to a green -> yellow -> red color scale.
+
+        :param residual: mean perpendicular inlier distance (metres)
+        :param max_residual: residual at which color saturates to full red
+        :returns: ColorRGBA with alpha=1
+        """
+        t = float(np.clip(residual / max_residual, 0.0, 1.0))
+        c = ColorRGBA()
+        c.a = 1.0
+
+        if t < 0.5:
+            # Green -> Yellow: ramp red up, keep green at 1
+            c.r = t * 2.0
+            c.g = 1.0
+        else:
+            # Yellow -> Red: ramp green down, keep red at 1
+            c.r = 1.0
+            c.g = (1.0 - t) * 2.0
+
+        c.b = 0.0
+        return c
 
 def main(args=None):
     rclpy.init(args=args)
