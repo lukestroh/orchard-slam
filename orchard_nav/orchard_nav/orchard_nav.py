@@ -583,7 +583,7 @@ class OrchardNav(LoggerNode):
         return c
 
 
-        def _action_goal_cb_explore(self, goal_handle):
+    def _action_goal_cb_explore(self, goal_handle):
         self.get_logger().info("Received explore goal request")
         return GoalResponse.ACCEPT
     
