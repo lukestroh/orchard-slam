@@ -11,18 +11,22 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import OccupancyGrid, Odometry
 from nav2_msgs.action import NavigateToPose
 from orchard_msgs.action import StartOrchardNavigation
-from orchard_msgs.msg import OrchardNavStatus
+from orchard_msgs.msg import OrchardNavState as OrchardNavStateMsg
 from geometry_msgs.msg import Pose, PoseStamped
 
 from orchard_slam_bringup.logger_node import LoggerNode
 from orchard_nav.nav_state import OrchardNavState
 
 import numpy as np
+from threading import Lock
 
 
 class OrchardNav(LoggerNode):
     def __init__(self):
         super().__init__("orchard_nav")
+
+        # locks
+        self._lock_local_costmap = Lock()
 
         # Callback groups
         self._cb_group_reentrant = ReentrantCallbackGroup()
@@ -67,15 +71,21 @@ class OrchardNav(LoggerNode):
             callback_group=self._cb_group_reentrant,
             qos_profile=10,
         )
-        self._sub_orchard_nav_status = self.create_subscription(
-            msg_type=OrchardNavStatus,
-            topic="/orchard_nav/status",
-            callback=self._sub_cb_orchard_nav_status,
+        self._sub_orchard_nav_active_state = self.create_subscription(
+            msg_type=OrchardNavStateMsg,
+            topic="/orchard_nav/active_state",
+            callback=self._sub_cb_orchard_nav_active_state,
             callback_group=self._cb_group_reentrant,
             qos_profile=self._qos_orchard_nav_status,
         )
 
         # Publishers
+        self._pub_orchard_nav_next_state = self.create_publisher(
+            msg_type=OrchardNavStateMsg,
+            topic="/orchard_nav/next_state",
+            callback_group=self._cb_group_reentrant,
+            qos_profile=self._qos_orchard_nav_status,
+        )
         self._pub_diff_drive_cmd_vel = self.create_publisher(
             msg_type=TwistStamped,
             topic="/diff_drive_controller/cmd_vel",
@@ -93,7 +103,7 @@ class OrchardNav(LoggerNode):
         self._action_svr_explore = ActionServer(
             node=self,
             action_type=StartOrchardNavigation,
-            action_name="explore",
+            action_name="/orchard_nav/explore",
             cancel_callback=self._action_cancel_cb_explore,
             goal_callback=self._action_goal_cb_explore,
             execute_callback=self._action_exec_cb_explore,
@@ -103,7 +113,7 @@ class OrchardNav(LoggerNode):
             # navigate to a pose by publishing
             node=self,
             action_type=StartOrchardNavigation,
-            action_name="traverse_row",
+            action_name="/orchard_nav/traverse_row",
             cancel_callback=self._action_cancel_cb_traverse_row,
             goal_callback=self._action_goal_cb_traverse_row,
             execute_callback=self._action_exec_cb_traverse_row,
@@ -112,7 +122,7 @@ class OrchardNav(LoggerNode):
         self._action_svr_turn_row = ActionServer(
             node=self,
             action_type=StartOrchardNavigation,
-            action_name="turn_row",
+            action_name="/orchard_nav/turn_row",
             cancel_callback=self._action_cancel_cb_turn_row,
             goal_callback=self._action_goal_cb_turn_row,
             execute_callback=self._action_exec_cb_turn_row,
@@ -121,7 +131,7 @@ class OrchardNav(LoggerNode):
         self._action_svr_return_home = ActionServer(
             node=self,
             action_type=StartOrchardNavigation,
-            action_name="return_home",
+            action_name="/orchard_nav/return_home",
             cancel_callback=self._action_cancel_cb_return_home,
             goal_callback=self._action_goal_cb_return_home,
             execute_callback=self._action_exec_cb_return_home,
@@ -131,8 +141,10 @@ class OrchardNav(LoggerNode):
         # Messages
         self._msg_laser_scan = None
         self._msg_local_costmap = None
+        self._msg_global_costmap = None
+        self._msg_occupancy_grid = None
         self._msg_robot_pose = None
-        self._msg_orchard_nav_status = None
+        self._msg_orchard_nav_active_state = None
         self._msg_initial_start_pose = None
 
         # State variables
@@ -148,7 +160,7 @@ class OrchardNav(LoggerNode):
         robot_pose = self._msg_robot_pose.pose.pose
         self.robot_pose = robot_pose
         self.robot_facing = np.arctan2(self.robot_pose.orientation.z, self.robot_pose.orientation.w) * 2.0
-        # self.get_logger().info(f"Current robot position: x={self.robot_pose.position.x}, y={self.robot_pose.position.y}")
+
         return
 
     def _sub_cb_nav_cmd_vel(self, msg: Twist):
@@ -162,22 +174,20 @@ class OrchardNav(LoggerNode):
         # self.get_logger().info(f"Received cmd_vel: linear={msg.linear.x}, angular={msg.angular.z}")
         return
 
-    def _sub_cb_laser_scan(self, msg):
+    def _sub_cb_laser_scan(self, msg: LaserScan):
         """Callback for laser scan data (obstacle detection)"""
         self._msg_laser_scan = msg
         return
 
-    def _sub_cb_local_costmap(self, msg):
+    def _sub_cb_local_costmap(self, msg: OccupancyGrid):
         """Callback for local costmap data"""
-        self._msg_local_costmap = msg
-        if self.check_if_goal_reached():
-            self.get_logger().info("Goal reached! Choosing a new goal...")
-            self.choose_goal()
+        with self._lock_local_costmap:
+            self._msg_local_costmap = msg
         return
 
-    def _sub_cb_orchard_nav_status(self, msg: OrchardNavStatus):
-        """Callback for orchard navigation status updates"""
-        self._msg_orchard_nav_status = msg
+    def _sub_cb_orchard_nav_active_state(self, msg: OrchardNavStateMsg):
+        """Callback for orchard navigation active state updates"""
+        self._msg_orchard_nav_active_state = msg
         return
     
     def _sub_cb_initial_start_pose(self, msg: PoseStamped):
@@ -296,13 +306,28 @@ class OrchardNav(LoggerNode):
         self.goal_handle = goal_handle
         _result = StartOrchardNavigation.Result()
 
-        while self._msg_orchard_nav_status.nav_state == OrchardNavState.TRAVERSE_ROW:
+        while self._msg_orchard_nav_active_state.nav_state == OrchardNavState.TRAVERSE_ROW.value:
             # goal_reached = self.check_if_goal_reached()
+            # if self.check_if_goal_reached():
+            #     self.get_logger().info("Goal reached! Choosing a new goal...")
+            #     self.choose_goal()
+            with self._lock_local_costmap:
+                local_costmap = self._msg_local_costmap
         
-            tree_positions = self.get_tree_positions()
-            if tree_positions:
-                goal = self.choose_goal()
-                self.info(f"{goal}")
+            tree_positions = self.get_tree_positions(local_costmap)
+            # self.warn(tree_positions)
+            # if tree_positions:
+            #     goal = self.choose_goal()
+            #     self.info(f"{goal}")
+
+            in_row = self.in_row(local_costmap.data)
+            self.warn(f"in_row: {in_row}")
+
+
+
+        # if turn, publish next state as turn. else, go home
+        # self._pub_orchard_nav_next_state.publish(OrchardNavStateMsg(nav_state=OrchardNavState.TURN_ROW.value))
+
 
         _result.success = True
         _result.message = ""
@@ -333,17 +358,18 @@ class OrchardNav(LoggerNode):
         )
         return distance < 0.2  # Consider goal reached if within 20 cm
 
-    def get_tree_positions(self):
+    def get_tree_positions(self, local_costmap):
         """Identify tree positions by clustering occupied cells in the window map"""
-        if self.window_map is None or self.robot_pose is None:
-            return []
 
+        if local_costmap is None or self.robot_pose is None:
+            return []
+        
         tree_positions = []
         visited = set()
-        grid_width = int(self.window_map.info.width)
+        grid_width = int(local_costmap.info.width)
 
         # Simple clustering: find connected occupied cells in window_map
-        for idx, cell in enumerate(self.window_map.data):
+        for idx, cell in enumerate(local_costmap.data):
             if cell > 50 and idx not in visited:  # Occupied cell
                 # BFS to find connected cluster
                 cluster = []
@@ -355,11 +381,11 @@ class OrchardNav(LoggerNode):
                     cluster.append(current_idx)
 
                     # Check neighbors (4-connectivity)
-                    for neighbor_idx in self._get_neighbors(current_idx, grid_width):
+                    for neighbor_idx in self._get_neighbors(current_idx, grid_width, local_costmap.data):
                         if (
                             neighbor_idx not in visited
-                            and 0 <= neighbor_idx < len(self.window_map.data)
-                            and self.window_map.data[neighbor_idx] > 50
+                            and 0 <= neighbor_idx < len(local_costmap.data)
+                            and local_costmap.data[neighbor_idx] > 50
                         ):
                             visited.add(neighbor_idx)
                             queue.append(neighbor_idx)
@@ -372,10 +398,10 @@ class OrchardNav(LoggerNode):
 
         return tree_positions
 
-    def _get_neighbors(self, idx, width):
+    def _get_neighbors(self, idx, width, map_data):
         """Get indices of 4-connected neighbors"""
         neighbors = []
-        if idx + 1 < len(self.map_data) and (idx + 1) % width != 0:
+        if idx + 1 < len(map_data) and (idx + 1) % width != 0:
             neighbors.append(idx + 1)
         if idx - 1 >= 0 and idx % width != 0:
             neighbors.append(idx - 1)
@@ -383,10 +409,10 @@ class OrchardNav(LoggerNode):
         neighbors.append(idx - width)
         return neighbors
 
-    def in_row(self):
-        if self.map_data is None:
+    def in_row(self, map_data):
+        if map_data is None:
             return False
-        return any(cell > 50 for cell in self.map_data)
+        return any(cell > 50 for cell in map_data)
 
     def choose_goal(self):
         """Logic to choose a new goal based on sensor data and map"""

@@ -11,6 +11,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
 from geometry_msgs.msg import PoseStamped
 from orchard_msgs.action import StartOrchardNavigation
+from orchard_msgs.msg import OrchardNavState as OrchardNavStateMsg
 from orchard_nav.nav_state import OrchardNavState
 from std_msgs.msg import Bool
 
@@ -28,11 +29,12 @@ class TraverseRowNavigationBehavior(pt.behaviour.Behaviour):
         self.node.info(f"Setting up {self.name}")
 
         # Action clients
-        self._navigate_to_pose_client = ActionClient(
+        self._action_client_traverse_row = ActionClient(
             node=self.node,
             action_type=StartOrchardNavigation,
-            action_name="/orchard_nav/start_in_row_navigation",
+            action_name="/orchard_nav/traverse_row",
         )
+        self._action_client_traverse_row.wait_for_server()
 
         # Behavior state
         self.goal_status = None
@@ -47,20 +49,17 @@ class TraverseRowNavigationBehavior(pt.behaviour.Behaviour):
 
     def initialise(self) -> None:
         """Call the NavigateToPose action with the goal pose from the blackboard"""
-        goal_pose = self.blackboard.get("goal_pose")
-        # if goal_pose is None:
-        #     self.node.error("No goal pose set on blackboard!")
-        #     self.goal_status = False
-        #     return
-
-        self.node.info(f"Sending navigation goal: {goal_pose}")
-
-        self.test_goal_pose = PoseStamped()
-        self.test_goal_pose.header.frame_id = "map"
-        self.test_goal_pose.header.stamp = self.node.get_clock().now().to_msg()
-        self.test_goal_pose.pose.position.x = 1.0
-        self.test_goal_pose.pose.position.y = 1.0
-
+        self.node._pub_orchard_nav_active_state.publish(OrchardNavStateMsg(nav_state=OrchardNavState.TRAVERSE_ROW.value))
+        start_nav_req = StartOrchardNavigation.Goal()
+        self._send_goal_future = self._action_client_traverse_row.send_goal_async(start_nav_req)
+        self._send_goal_future.add_done_callback(callback=self._send_goal_cb)
+        return
+    
+    def _send_goal_cb(self, future: Future):
+        goal_handle: ClientGoalHandle = future.result()
+        result: StartOrchardNavigation.Result = future.result()
+        if result.success:
+            self.goal_status = True
         return
 
     def update(self) -> pt.common.Status:

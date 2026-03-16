@@ -21,7 +21,7 @@ from orchard_slam_bt.behaviors.turn_row_nav import TurningNavigationBehavior
 from orchard_slam_bt.behaviors.go_home_nav import GoHomeNavigationBehavior
 
 from geometry_msgs.msg import PoseStamped
-from orchard_msgs.msg import OrchardNavStatus
+from orchard_msgs.msg import OrchardNavState as OrchardNavStateMsg
 from sensor_msgs.msg import Imu, NavSatFix
 
 
@@ -56,14 +56,12 @@ class OrchardSlamTree(LoggerNode):
 
         # qos profiles
         self._qos_imu = QoSProfile(depth=10, reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT)
-        self._qos_orchard_nav_status = QoSProfile(
+        self._qos_orchard_nav_state = QoSProfile(
             depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL
         )
         self._qos_initial_start_pose = QoSProfile(
             depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL
         )
-
-        self.save_map_name = self.get_param_val("map_name") + "_" + dt.datetime.now().strftime("%Y%m%d-%H%M%S")
 
         # Callback groups
         self._cb_group_reentrant = ReentrantCallbackGroup()
@@ -83,19 +81,19 @@ class OrchardSlamTree(LoggerNode):
             callback_group=self._cb_group_reentrant,
             qos_profile=self._qos_imu,
         )
-        self._sub_orchard_nav_status = self.create_subscription(
-            msg_type=OrchardNavStatus,
-            topic="/orchard_nav/status",
-            callback=self._sub_cb_orchard_nav_status,
+        self._sub_orchard_nav_next_state = self.create_subscription(
+            msg_type=OrchardNavStateMsg,
+            topic="/orchard_nav/next_state",
+            callback=self._sub_cb_orchard_next_state,
             callback_group=self._cb_group_reentrant,
-            qos_profile=self._qos_orchard_nav_status,
+            qos_profile=self._qos_orchard_nav_state,
         )
 
         # Publishers
-        self._pub_orchard_nav_status = self.create_publisher(
-            msg_type=OrchardNavStatus,  # TODO: potentially change to int or enum for more complex status
-            topic="/orchard_nav/status",
-            qos_profile=self._qos_orchard_nav_status,
+        self._pub_orchard_nav_active_state = self.create_publisher(
+            msg_type=OrchardNavStateMsg,
+            topic="/orchard_nav/active_state",
+            qos_profile=self._qos_orchard_nav_state,
         )
         self._pub_initial_start_pose = self.create_publisher(
             msg_type=PoseStamped,
@@ -117,8 +115,9 @@ class OrchardSlamTree(LoggerNode):
         self.blackboard.register_key("imu", access=pt.common.Access.WRITE)
         self.blackboard.register_key("map_name", access=pt.common.Access.WRITE)
         self.blackboard.register_key("mapping_complete", access=pt.common.Access.WRITE)
-        self.blackboard.register_key("orchard_nav/state", access=pt.common.Access.WRITE)
-        self.blackboard.register_key(key="initial_start_pose", access=pt.common.Access.WRITE)
+        self.blackboard.register_key("orchard_nav/active_state", access=pt.common.Access.WRITE)
+        self.blackboard.register_key("orchard_nav/next_state", access=pt.common.Access.WRITE)
+        self.blackboard.register_key("initial_start_pose", access=pt.common.Access.WRITE)
         self.blackboard.register_key("record_bag", access=pt.common.Access.WRITE)
         self.blackboard.set("goal_pose", None)
         self.blackboard.set("gps/filtered", None)
@@ -127,7 +126,12 @@ class OrchardSlamTree(LoggerNode):
         self.blackboard.set("record_bag", self.record_bag)
         self.blackboard.set("map_name", self.map_name)
         self.blackboard.set("mapping_complete", False)
-        self.blackboard.set("orchard_nav/state", OrchardNavState.IDLE)
+        self.blackboard.set("orchard_nav/active_state", OrchardNavState.TRAVERSE_ROW)
+        self.blackboard.set("orchard_nav/next_state", None)
+
+
+        # Other properties
+        self.save_map_name = self.get_param_val("map_name") + "_" + dt.datetime.now().strftime("%Y%m%d-%H%M%S")
 
         # Behavior tree
         self.tree = self.create_behavior_tree()
@@ -135,6 +139,8 @@ class OrchardSlamTree(LoggerNode):
         self.tree.add_post_tick_handler(ft.partial(self.post_tick_handler, self.snapshot_visitor))
         self.tree.add_visitor(self.snapshot_visitor)
         self.last_tree_snapshot = None
+
+        
 
         return
 
@@ -148,16 +154,18 @@ class OrchardSlamTree(LoggerNode):
         self.blackboard.set("imu", msg)
         return
 
-    def _sub_cb_orchard_nav_status(self, msg: OrchardNavStatus):
-        self.blackboard.set("orchard_nav/state", msg.nav_state)
+    def _sub_cb_orchard_next_state(self, msg: OrchardNavStateMsg):
+        """Set the next nav state as the active state"""
+        self.blackboard.set("orchard_nav/active_state", OrchardNavState(msg.nav_state))
+        self._pub_orchard_nav_active_state.publish(msg)
         return
 
-    def _timer_cb_pub_orchard_nav_status(self):
-        """Publish the current orchard navigation state from the blackboard at a regular interval"""
-        nav_status_msg = OrchardNavStatus()
-        nav_status_msg.nav_state = self.blackboard.get("orchard_nav/state")
-        self._pub_orchard_nav_status.publish(nav_status_msg)
-        return
+    # def _timer_cb_pub_orchard_nav_active_state(self):
+    #     """Publish the current orchard navigation state from the blackboard at a regular interval"""
+    #     nav_active_state_msg = OrchardNavStateMsg()
+    #     nav_active_state_msg.nav_state = self.blackboard.get("orchard_nav/active_state")
+    #     self._pub_orchard_nav_active_state.publish(nav_active_state_msg)
+    #     return
 
     def create_behavior_tree(self):
         # Behaviors
@@ -176,6 +184,11 @@ class OrchardSlamTree(LoggerNode):
             child=load_pose_graph_behavior,
             condition=lambda: self.load_map is True,
         )
+        load_pose_one_shot = pt.decorators.OneShot(
+            name="load_pose_one_shot",
+            child=load_pose_graph_guard,
+            policy=pt.common.OneShotPolicy.ON_COMPLETION,  # Only load posegraph once at the start of the tree
+        )
 
         start_bag_record_guard = pt.decorators.EternalGuard(
             name="start_bag_record_guard",
@@ -183,30 +196,40 @@ class OrchardSlamTree(LoggerNode):
             condition=lambda: self.blackboard.get("record_bag") is True,
             blackboard_keys=["record_bag"],
         )
+        start_bag_record_one_shot = pt.decorators.OneShot(
+            name="start_bag_record_one_shot",
+            child=start_bag_record_guard,
+            policy=pt.common.OneShotPolicy.ON_COMPLETION,
+        )
         stop_bag_record_guard = pt.decorators.EternalGuard(
             name="stop_bag_record_guard",
             child=stop_bag_record_behavior,
             condition=lambda: self.blackboard.get("record_bag") is True,
             blackboard_keys=["record_bag"],
         )
+        stop_bag_record_one_shot = pt.decorators.OneShot(
+            name="stop_bag_record_one_shot",
+            child=stop_bag_record_guard,
+            policy=pt.common.OneShotPolicy.ON_COMPLETION,
+        )
 
         row_guard = pt.decorators.EternalGuard(
             name="row_guard",
             child=traverse_row_behavior,
-            condition=lambda: self.blackboard.get("orchard_nav/state") == OrchardNavState.TRAVERSE_ROW,
-            blackboard_keys=["orchard_nav/state"],
+            condition=lambda: self.blackboard.get("orchard_nav/active_state") == OrchardNavState.TRAVERSE_ROW,
+            blackboard_keys=["orchard_nav/active_state"],
         )
         turn_guard = pt.decorators.EternalGuard(
             name="turn_guard",
             child=turn_behavior,
-            condition=lambda: self.blackboard.get("orchard_nav/state") == OrchardNavState.TURN_ROW,
-            blackboard_keys=["orchard_nav/state"],
+            condition=lambda: self.blackboard.get("orchard_nav/active_state") == OrchardNavState.TURN_ROW,
+            blackboard_keys=["orchard_nav/active_state"],
         )
         go_home_guard = pt.decorators.EternalGuard(
             name="go_home_guard",
             child=go_home_behavior,
-            condition=lambda: self.blackboard.get("orchard_nav/state") == OrchardNavState.RETURN_HOME,
-            blackboard_keys=["orchard_nav/state"],
+            condition=lambda: self.blackboard.get("orchard_nav/active_state") == OrchardNavState.RETURN_HOME,
+            blackboard_keys=["orchard_nav/active_state"],
         )  # Go home behavior should publish a 'mapping_complete' flag on the blackboard when done to save posegraph
 
         navigation_selector = pt.composites.Selector(
@@ -218,8 +241,8 @@ class OrchardSlamTree(LoggerNode):
             name="navigation_guard",
             child=navigation_selector,
             condition=lambda: self.blackboard.get("mapping_complete") is False
-            and self.blackboard.get("orchard_nav/state") != OrchardNavState.TASK_COMPLETE,
-            blackboard_keys=["mapping_complete", "orchard_nav/state"],
+            and self.blackboard.get("orchard_nav/active_state") != OrchardNavState.TASK_COMPLETE,
+            blackboard_keys=["mapping_complete", "orchard_nav/active_state"],
         )
         navigation_success_is_running = pt.decorators.SuccessIsRunning(
             name="navigation_success_is_running",
@@ -236,11 +259,11 @@ class OrchardSlamTree(LoggerNode):
         task_selector = pt.composites.Selector(
             name="task_selector",
             children=[
-                load_pose_graph_guard,
-                start_bag_record_guard,
-                stop_bag_record_guard,
+                load_pose_one_shot,
+                start_bag_record_one_shot,
                 navigation_success_is_running,
                 save_posegraph_guard,
+                stop_bag_record_one_shot,
             ],
             memory=False,
         )

@@ -34,7 +34,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         package="orchard_nav",
         executable="orchard_nav",
         name="orchard_nav",
-        output="screen",
+        output="both",
         parameters=[{"use_sim_time": use_sim_time}],
     )
 
