@@ -176,6 +176,7 @@ class OrchardNav(LoggerNode):
         self.goal_pose = None
         self.robot_yaw = None
         self.row_detected = False
+        self._gate_nav2_cmd_vel = False
         return
 
     def _sub_cb_odom(self, msg: Odometry):
@@ -188,15 +189,14 @@ class OrchardNav(LoggerNode):
         return
 
     def _sub_cb_nav_cmd_vel(self, msg: Twist):
-        """Callback for cmd_vel to track robot's current velocity (if needed)"""
+        if self._gate_nav2_cmd_vel:
+            return
         twist_stamped = TwistStamped()
         twist_stamped.header.stamp = self.get_clock().now().to_msg()
         twist_stamped.twist = Twist()
         twist_stamped.twist.linear.x = msg.linear.x
         twist_stamped.twist.angular.z = msg.angular.z
-        self._pub_diff_drive_cmd_vel.publish(twist_stamped)  # Forward the cmd_vel message to the robot
-        # self.get_logger().info(f"Received cmd_vel: linear={msg.linear.x}, angular={msg.angular.z}")
-        return
+        self._pub_diff_drive_cmd_vel.publish(twist_stamped)
 
     def _sub_cb_laser_scan(self, msg: LaserScan):
         """Callback for laser scan data (obstacle detection)"""
@@ -284,25 +284,41 @@ class OrchardNav(LoggerNode):
         return _result
     
     def _action_exec_cb_turn_row(self, goal_handle: ServerGoalHandle):
-        """Execute the turn_row behavior"""
+        """Execute the turn_row behavior — currently stops the robot for debugging."""
         _result = StartOrchardNavigation.Result()
-        # turn in place until facing down the next row, then succeed the goal. Timeout after 10s if not facing row
-        start_time = self.get_clock().now()
-        while self._msg_orchard_nav_status.nav_state == OrchardNavState.TURN_ROW:
-            if self.row_detected and self.robot_yaw is not None and abs(self.robot_yaw) < np.pi / 4:
-                self.info("Successfully turned into the next row! Succeeding turn_row goal.")
-                break
-            if (self.get_clock().now() - start_time).nanoseconds > 10 * 1e9:  # 10 second timeout
-                self.fatal("Turn row behavior timed out without successfully turning.")
-                _result.success = False
-                _result.message = "Turn row behavior timed out without successfully turning."
-                goal_handle.abort()
-                return _result
-            
+
+        self.info("END OF ROW: stopping robot for debugging.")
+        for _ in range(10):  # publish zero vel several times to override any in-flight Nav2 commands
+            cmd_vel = TwistStamped()
+            cmd_vel.header.stamp = self.get_clock().now().to_msg()
+            cmd_vel.twist.linear.x = 0.0
+            cmd_vel.twist.angular.z = 0.0
+            self._pub_diff_drive_cmd_vel.publish(cmd_vel)
+            self.get_clock().sleep_for(Duration(seconds=0.05))
+
         _result.success = True
-        _result.message = "Turn row behavior completed successfully."
-        goal_handle.succeed()
+        _result.message = "Turn row stub: robot stopped."
+        goal_handle.succeed(_result)
         return _result
+
+    def is_in_row(self, costmap: OccupancyGrid, obstacle_threshold: int = 65) -> bool:
+        """Returns True if there are obstacles in the forward-facing third of the local costmap."""
+        if costmap is None or self.robot_yaw is None:
+            return True
+
+        data = np.array(costmap.data, dtype=np.int16).reshape(
+            (costmap.info.height, costmap.info.width)
+        )
+        h, w = data.shape
+
+        # Select the front third of the grid in the robot's forward direction
+        if abs(np.cos(self.robot_yaw)) > abs(np.sin(self.robot_yaw)):  # mostly facing ±x
+            front = data[:, 2*w // 3:] if np.cos(self.robot_yaw) > 0 else data[:, :w // 3]
+        else:                                                            # mostly facing ±y
+            front = data[2*h // 3:, :] if np.sin(self.robot_yaw) > 0 else data[:h // 3, :]
+
+        return bool(np.any(front >= obstacle_threshold))
+
 
     def _action_exec_cb_traverse_row(self, goal_handle: ServerGoalHandle):
         """Get the goal"""
@@ -315,7 +331,13 @@ class OrchardNav(LoggerNode):
             with self._lock_global_costmap:
                 global_costmap = self._msg_global_costmap
 
-            # check if still in row
+            if not self.is_in_row(local_costmap):
+                self.info("END OF ROW detected — transitioning to TURN_ROW.")
+                self._gate_nav2_cmd_vel = True  # block Nav2 immediately, before BT transitions
+                self._pub_orchard_nav_next_state.publish(
+                    OrchardNavStateMsg(nav_state=OrchardNavState.TURN_ROW.value)
+                )
+                break
             ...
             # need to find a way to detect if we've been in all rows. 
             # look to see if there was another line of trees that we haven't traversed yet. We can detect
@@ -366,8 +388,6 @@ class OrchardNav(LoggerNode):
 
 
         # if turn, publish next state as turn. else, go home
-        # self._pub_orchard_nav_next_state.publish(OrchardNavStateMsg(nav_state=OrchardNavState.TURN_ROW.value))
-
 
         _result.success = True
         _result.message = ""

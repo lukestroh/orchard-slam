@@ -170,14 +170,14 @@ controller_server_rclcpp_node:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 1.0
-      publish_frequency: 1.0
+      update_frequency: 5.0
+      publish_frequency: 5.0
       global_frame: odom
       robot_base_frame: amiga__base
       use_sim_time: True
       rolling_window: true
-      width: 6
-      height: 6
+      width: 20
+      height: 8
       resolution: 0.05
       robot_radius: 0.6
       plugins: ["obstacle_layer", "voxel_layer", "inflation_layer"]
@@ -228,6 +228,9 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
+      rolling_window: true
+      width: 20        # metres — should be larger than your local costmap
+      height: 20
       update_frequency: 1.0
       publish_frequency: 1.0
       global_frame: map
