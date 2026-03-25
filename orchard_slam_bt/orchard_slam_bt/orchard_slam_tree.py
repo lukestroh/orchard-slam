@@ -4,19 +4,26 @@ This node begins a new mapping session and saves the posegraph at the end. It ca
 """
 import py_trees as pt
 import rclpy
-from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.parameter import Parameter
-from rclpy.qos import QoSProfile
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
 
 from orchard_slam_bringup.logger_node import LoggerNode
+from orchard_nav.nav_state import OrchardNavState
 from orchard_slam_bt.behaviors.save_posegraph import SavePosegraphBehavior
 from orchard_slam_bt.behaviors.load_posegraph import LoadPosegraphBehavior
 from orchard_slam_bt.behaviors.start_bag_record import StartBagRecordBehavior
 from orchard_slam_bt.behaviors.stop_bag_record import StopBagRecordBehavior
+from orchard_slam_bt.behaviors.traverse_row_nav import TraverseRowNavigationBehavior
+from orchard_slam_bt.behaviors.turn_row_nav import TurningNavigationBehavior
+from orchard_slam_bt.behaviors.go_home_nav import GoHomeNavigationBehavior
 
+from geometry_msgs.msg import PoseStamped
+from orchard_msgs.msg import OrchardNavState as OrchardNavStateMsg
 from sensor_msgs.msg import Imu, NavSatFix
+
 
 import datetime as dt
 import functools as ft
@@ -30,38 +37,31 @@ class OrchardSlamTree(LoggerNode):
         # Parameters
         _params = {
             "load_map": Parameter.Type.BOOL,
+            "initial_start_pose": Parameter.Type.STRING,  # "(x,y,theta)" in map frame
             "map_name": Parameter.Type.STRING,
             "record_bag": Parameter.Type.BOOL,
         }
         self.declare_parameters(namespace="", parameters=_params.items())
         self.load_map = self.get_param_val("load_map")
-        self.load_map_name = None
+        self.map_name = self.get_param_val("map_name")
+        self.record_bag = self.get_param_val("record_bag")
+        if self.get_param_val("initial_start_pose") == "":
+            self.initial_start_pose = None
+        else:
+            self.initial_start_pose = tuple(map(float, self.get_param_val("initial_start_pose").strip("()").split(",")))
 
         # Callback groups
         self._cb_group_reentrant = ReentrantCallbackGroup()
+        self._cb_group_orchard_nav_status = MutuallyExclusiveCallbackGroup()
 
         # qos profiles
         self._qos_imu = QoSProfile(depth=10, reliability=rclpy.qos.ReliabilityPolicy.BEST_EFFORT)
-
-        # Get the latest map by datetime if loading a map
-        if self.load_map:
-            map_name = self.get_param_val("map_name")
-            map_files = glob.glob(os.path.join(os.getcwd(), "src", "orchard-slam", "maps", f"{map_name}_*.posegraph"))
-            if len(map_files) == 0:
-                self.error(f"No map files found for map name {map_name}. Starting a new mapping session instead.")
-                pass
-
-            # Sort map files by datetime and get the latest one
-            def extract_datetime(filename):
-                stem = filename.rsplit('.', 1)[0]  # remove extension
-                dt_str = stem.rsplit('_', 1)[-1]  # grab last segment after underscore
-                return dt.datetime.strptime(dt_str, "%Y%m%d-%H%M%S")
-
-            self.load_map_name = max(map_files, key=extract_datetime)            
-            self.info(f"Loading map: {self.load_map_name}")
-
-        self.save_map_name = self.get_param_val("map_name") + "_" + dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.record_bag = self.get_param_val("record_bag")
+        self._qos_orchard_nav_state = QoSProfile(
+            depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL
+        )
+        self._qos_initial_start_pose = QoSProfile(
+            depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL
+        )
 
         # Callback groups
         self._cb_group_reentrant = ReentrantCallbackGroup()
@@ -72,23 +72,66 @@ class OrchardSlamTree(LoggerNode):
             topic="/gps/filtered",
             callback=self._sub_cb_gps,
             callback_group=self._cb_group_reentrant,
-            qos_profile=10
+            qos_profile=10,
         )
         self._sub_imu = self.create_subscription(
             msg_type=Imu,
-            topic="/imu",
+            topic="/imu/fixed",
             callback=self._sub_cb_imu,
             callback_group=self._cb_group_reentrant,
-            qos_profile=self._qos_imu
+            qos_profile=self._qos_imu,
+        )
+        self._sub_orchard_nav_next_state = self.create_subscription(
+            msg_type=OrchardNavStateMsg,
+            topic="/orchard_nav/next_state",
+            callback=self._sub_cb_orchard_next_state,
+            callback_group=self._cb_group_reentrant,
+            qos_profile=self._qos_orchard_nav_state,
         )
 
-        # Blackboard
+        # Publishers
+        self._pub_orchard_nav_active_state = self.create_publisher(
+            msg_type=OrchardNavStateMsg,
+            topic="/orchard_nav/active_state",
+            qos_profile=self._qos_orchard_nav_state,
+        )
+        self._pub_initial_start_pose = self.create_publisher(
+            msg_type=PoseStamped,
+            topic="/orchard_nav/initial_start_pose",
+            qos_profile=self._qos_initial_start_pose,
+        )
+
+        # # Timers
+        # self._timer_pub_orchard_nav_status = self.create_timer(
+        #     timer_period_sec=0.25,
+        #     callback=self._timer_cb_pub_orchard_nav_status,
+        #     callback_group=self._cb_group_orchard_nav_status,
+        # )
+
+        # Blackboard TODO: probably don't need to register all keys on blackboard, just do from behaviors
         self.blackboard = pt.blackboard.Client(name=node_name)
-        self.blackboard.register_key("map_name", access=pt.common.Access.WRITE)
-        self.blackboard.register_key("gps_filtered", access=pt.common.Access.WRITE)
+        self.blackboard.register_key("goal_pose", access=pt.common.Access.WRITE)
+        self.blackboard.register_key("gps/filtered", access=pt.common.Access.WRITE)
         self.blackboard.register_key("imu", access=pt.common.Access.WRITE)
-        self.blackboard.set("gps_filtered", None)
+        self.blackboard.register_key("map_name", access=pt.common.Access.WRITE)
+        self.blackboard.register_key("mapping_complete", access=pt.common.Access.WRITE)
+        self.blackboard.register_key("orchard_nav/active_state", access=pt.common.Access.WRITE)
+        self.blackboard.register_key("orchard_nav/next_state", access=pt.common.Access.WRITE)
+        self.blackboard.register_key("initial_start_pose", access=pt.common.Access.WRITE)
+        self.blackboard.register_key("record_bag", access=pt.common.Access.WRITE)
+        self.blackboard.set("goal_pose", None)
+        self.blackboard.set("gps/filtered", None)
         self.blackboard.set("imu", None)
+        self.blackboard.set("initial_start_pose", self.initial_start_pose)
+        self.blackboard.set("record_bag", self.record_bag)
+        self.blackboard.set("map_name", self.map_name)
+        self.blackboard.set("mapping_complete", False)
+        self.blackboard.set("orchard_nav/active_state", OrchardNavState.TRAVERSE_ROW)
+        self.blackboard.set("orchard_nav/next_state", None)
+
+
+        # Other properties
+        self.save_map_name = self.get_param_val("map_name") + "_" + dt.datetime.now().strftime("%Y%m%d-%H%M%S")
 
         # Behavior tree
         self.tree = self.create_behavior_tree()
@@ -97,42 +140,143 @@ class OrchardSlamTree(LoggerNode):
         self.tree.add_visitor(self.snapshot_visitor)
         self.last_tree_snapshot = None
 
+        
+
         return
-    
+
     def _sub_cb_gps(self, msg: NavSatFix):
         """Store the latest GPS reading on the blackboard for other behaviors to use"""
-        self.blackboard.set("gps_filtered", msg)
+        self.blackboard.set("gps/filtered", msg)
         return
 
     def _sub_cb_imu(self, msg: Imu):
         """Store the latest IMU reading on the blackboard for other behaviors to use"""
         self.blackboard.set("imu", msg)
         return
-    
+
+    def _sub_cb_orchard_next_state(self, msg: OrchardNavStateMsg):
+        """Set the next nav state as the active state"""
+        self.blackboard.set("orchard_nav/active_state", OrchardNavState(msg.nav_state))
+        self._pub_orchard_nav_active_state.publish(msg)
+        return
+
+    # def _timer_cb_pub_orchard_nav_active_state(self):
+    #     """Publish the current orchard navigation state from the blackboard at a regular interval"""
+    #     nav_active_state_msg = OrchardNavStateMsg()
+    #     nav_active_state_msg.nav_state = self.blackboard.get("orchard_nav/active_state")
+    #     self._pub_orchard_nav_active_state.publish(nav_active_state_msg)
+    #     return
+
     def create_behavior_tree(self):
         # Behaviors
-        while (self.blackboard.get("gps_filtered") is None or self.blackboard.get("imu") is None) and self.load_map:
-            self.info("Waiting for GPS and IMU data on the blackboard before creating the behavior tree...")
-            rclpy.spin_once(self, timeout_sec=0.1)
-        load_pose_graph_behavior = LoadPosegraphBehavior(name="load_posegraph_behavior", load_map=self.load_map, map_name=self.load_map_name)
-        # start_bag_record_behavior = StartBagRecordBehavior(name="start_bag_record_behavior", record_bag=self.record_bag)
-        save_posegraph_behavior = SavePosegraphBehavior(name="save_posegraph_behavior", map_name=self.save_map_name)
-        
+        load_pose_graph_behavior = LoadPosegraphBehavior(
+            name="load_posegraph_behavior", map_name=self.map_name, initial_pose=self.initial_start_pose
+        )
+        start_bag_record_behavior = StartBagRecordBehavior(name="start_bag_record_behavior")
+        stop_bag_record_behavior = StopBagRecordBehavior(name="stop_bag_record_behavior")
+        save_posegraph_behavior = SavePosegraphBehavior(name="save_posegraph", map_name=self.save_map_name)
+        traverse_row_behavior = TraverseRowNavigationBehavior(name="traverse_row")
+        turn_behavior = TurningNavigationBehavior(name="turn_around_row")
+        go_home_behavior = GoHomeNavigationBehavior(name="go_home")
 
+        load_pose_graph_guard = pt.decorators.EternalGuard(
+            name="load_pose_graph_guard",
+            child=load_pose_graph_behavior,
+            condition=lambda: self.load_map is True,
+        )
+        load_pose_one_shot = pt.decorators.OneShot(
+            name="load_pose_one_shot",
+            child=load_pose_graph_guard,
+            policy=pt.common.OneShotPolicy.ON_COMPLETION,  # Only load posegraph once at the start of the tree
+        )
 
-        root_sequence = pt.composites.Sequence(
-            name="RunSlamTree",
+        start_bag_record_guard = pt.decorators.EternalGuard(
+            name="start_bag_record_guard",
+            child=start_bag_record_behavior,
+            condition=lambda: self.blackboard.get("record_bag") is True,
+            blackboard_keys=["record_bag"],
+        )
+        start_bag_record_one_shot = pt.decorators.OneShot(
+            name="start_bag_record_one_shot",
+            child=start_bag_record_guard,
+            policy=pt.common.OneShotPolicy.ON_COMPLETION,
+        )
+        stop_bag_record_guard = pt.decorators.EternalGuard(
+            name="stop_bag_record_guard",
+            child=stop_bag_record_behavior,
+            condition=lambda: self.blackboard.get("record_bag") is True,
+            blackboard_keys=["record_bag"],
+        )
+        stop_bag_record_one_shot = pt.decorators.OneShot(
+            name="stop_bag_record_one_shot",
+            child=stop_bag_record_guard,
+            policy=pt.common.OneShotPolicy.ON_COMPLETION,
+        )
+
+        row_guard = pt.decorators.EternalGuard(
+            name="row_guard",
+            child=traverse_row_behavior,
+            condition=lambda: self.blackboard.get("orchard_nav/active_state") == OrchardNavState.TRAVERSE_ROW,
+            blackboard_keys=["orchard_nav/active_state"],
+        )
+        turn_guard = pt.decorators.EternalGuard(
+            name="turn_guard",
+            child=turn_behavior,
+            condition=lambda: self.blackboard.get("orchard_nav/active_state") == OrchardNavState.TURN_ROW,
+            blackboard_keys=["orchard_nav/active_state"],
+        )
+        go_home_guard = pt.decorators.EternalGuard(
+            name="go_home_guard",
+            child=go_home_behavior,
+            condition=lambda: self.blackboard.get("orchard_nav/active_state") == OrchardNavState.RETURN_HOME,
+            blackboard_keys=["orchard_nav/active_state"],
+        )  # Go home behavior should publish a 'mapping_complete' flag on the blackboard when done to save posegraph
+
+        navigation_selector = pt.composites.Selector(
+            name="navigation_selector",
+            children=[row_guard, turn_guard, go_home_guard],
+            memory=False,
+        )
+        navigation_guard = pt.decorators.EternalGuard(
+            name="navigation_guard",
+            child=navigation_selector,
+            condition=lambda: self.blackboard.get("mapping_complete") is False
+            and self.blackboard.get("orchard_nav/active_state") != OrchardNavState.TASK_COMPLETE,
+            blackboard_keys=["mapping_complete", "orchard_nav/active_state"],
+        )
+        navigation_success_is_running = pt.decorators.SuccessIsRunning(
+            name="navigation_success_is_running",
+            child=navigation_guard,
+        )
+
+        save_posegraph_guard = pt.decorators.EternalGuard(
+            name="save_posegraph_guard",
+            child=save_posegraph_behavior,
+            condition=lambda: self.blackboard.get("mapping_complete") is True,
+            blackboard_keys=["mapping_complete"],
+        )
+
+        task_selector = pt.composites.Selector(
+            name="task_selector",
             children=[
-                load_pose_graph_behavior,
-                # start_bag_record_behavior,
-                # save_posegraph_behavior
+                load_pose_one_shot,
+                start_bag_record_one_shot,
+                navigation_success_is_running,
+                save_posegraph_guard,
+                stop_bag_record_one_shot,
             ],
             memory=False,
         )
 
-        root = root_sequence # edit for later when we have more behaviors
+        root_sequence = pt.composites.Sequence(
+            name="RunSlamTree",
+            children=[
+                task_selector,
+            ],
+            memory=False,
+        )
 
-        tree = pt.trees.BehaviourTree(root=root)
+        tree = pt.trees.BehaviourTree(root=root_sequence)
         tree.setup(
             timeout=pt.common.Duration.INFINITE,
             node=self,
@@ -140,10 +284,10 @@ class OrchardSlamTree(LoggerNode):
 
         self.description()
         return tree
-    
+
     def description(self):
         """Print description about the program"""
-        msg = "RunSlamTree"
+        msg = "OrchardSlamTree"
         self.info(
             pt.console.green
             + 80 * "*"
@@ -160,10 +304,8 @@ class OrchardSlamTree(LoggerNode):
             + pt.console.reset
         )
         return
-    
-    def post_tick_handler(
-        self, snapshot_visitor: pt.visitors.SnapshotVisitor, behavior_tree: pt.trees.BehaviourTree
-    ):
+
+    def post_tick_handler(self, snapshot_visitor: pt.visitors.SnapshotVisitor, behavior_tree: pt.trees.BehaviourTree):
         """Write the tree snapshot to the console."""
         # snapshot_visitor.
         # if self.get_clock().now() - self._last_log_time > Duration(seconds=0.005):
@@ -187,7 +329,7 @@ class OrchardSlamTree(LoggerNode):
             )
             # self._last_log_time = self.get_clock().now()
             self.last_tree_snapshot = current_snapshot
-    
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -199,13 +341,13 @@ def main(args=None):
     try:
         while rclpy.ok() and node.tree.root.status not in [pt.common.Status.SUCCESS, pt.common.Status.FAILURE]:
             rclpy.spin_once(node, timeout_sec=0.1)
-        
+
         # Tree has reached terminal state
         if node.tree.root.status == pt.common.Status.SUCCESS:
             node.info("Behavior tree completed successfully.")
         elif node.tree.root.status == pt.common.Status.FAILURE:
             node.error("Behavior tree failed.")
-            
+
     except KeyboardInterrupt:
         node.info("Keyboard interrupt received, shutting down.")
     finally:

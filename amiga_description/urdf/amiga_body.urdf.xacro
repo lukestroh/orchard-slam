@@ -6,7 +6,7 @@
       <color rgba="0.941 0.941 0.941 1.0"/>
     </material>
 
-    <xacro:property name="amiga_mass" value="40.0"/>
+    <xacro:property name="amiga_mass" value="140.0"/>
     <xacro:property name="amiga_collision_box0_x" value='1.132'/>
     <xacro:property name="amiga_collision_box0_y" value='0.800'/>
     <xacro:property name="amiga_collision_box0_z" value='0.99810607'/>

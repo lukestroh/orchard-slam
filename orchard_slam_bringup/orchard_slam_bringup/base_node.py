@@ -8,11 +8,12 @@ import yaml
 # For writing param dumper:
 # https://github.com/ros2/ros2cli/blob/master/ros2param/ros2param/verb/dump.py
 
+
 class BaseNode(Node):
     def __init__(self, node_name):
         super().__init__(node_name=node_name)
         return
-    
+
     def declare_parameter_dict(self, **kwargs):
         for key, val in kwargs.items():
             self.declare_parameter(key, val)

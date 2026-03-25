@@ -13,10 +13,9 @@ from ros2bag_msgs.srv import StartRecord
 
 
 class StartBagRecordBehavior(pt.behaviour.Behaviour):
-    def __init__(self, name: str, record_bag: bool):
+    def __init__(self, name: str):
         super(StartBagRecordBehavior, self).__init__(name)
         self.name = name
-        self.record_bag = record_bag
         return
 
     def setup(self, node: LoggerNode):
@@ -25,7 +24,7 @@ class StartBagRecordBehavior(pt.behaviour.Behaviour):
 
         # Service clients
         self._srv_client_start_bag_record = self.node.create_client(srv_name="/start_bag_record", srv_type=StartRecord)
-        self._srv_client_start_bag_record.wait_for_service()
+        # self._srv_client_start_bag_record.wait_for_service()
 
         # Behaviour attributes
         self.goal_status = None
@@ -36,11 +35,6 @@ class StartBagRecordBehavior(pt.behaviour.Behaviour):
 
     def initialise(self):
         """Call the start bag record service"""
-        if self.record_bag == False:
-            self.goal_status = True
-        else:
-            self.goal_status = None
-
         self.node.info(f"Recording bag: {self.record_bag}")
         start_record_req = StartRecord.Request()
         # start_record_req.record_bag = True

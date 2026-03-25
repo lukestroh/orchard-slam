@@ -12,19 +12,18 @@ from orchard_slam_bringup.logger_node import LoggerNode
 
 
 class StopBagRecordBehavior(pt.behaviour.Behaviour):
-    def __init__(self, name: str, record_bag: bool):
+    def __init__(self, name: str):
         super(StopBagRecordBehavior, self).__init__(name)
         self.name = name
-        self.record_bag = record_bag
         return
 
     def setup(self, node: LoggerNode):
         self.node = node
-        self.info(f"Setting up {self.name}")
+        self.node.info(f"Setting up {self.name}")
 
         # Service clients
         self._srv_client_stop_bag_record = self.node.create_client(srv_name="/stop_bag_record", srv_type=StopRecord)
-        self._srv_client_stop_bag_record.wait_for_service()
+        # self._srv_client_stop_bag_record.wait_for_service()
 
         # Behaviour attributes
         self.goal_status = None
@@ -35,10 +34,6 @@ class StopBagRecordBehavior(pt.behaviour.Behaviour):
 
     def initialise(self):
         """Call the stop bag record service"""
-        if self.record_bag == False:
-            self.goal_status = True
-        else:
-            self.goal_status = None
         stop_record_req = StopRecord.Request()
         self._send_goal_future: Future = self._srv_client_stop_bag_record.call_async(request=stop_record_req)
         self._send_goal_future.add_done_callback(callback=self._send_goal_cb)

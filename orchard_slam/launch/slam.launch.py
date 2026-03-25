@@ -12,7 +12,8 @@ from launch_ros.actions import Node
 import os
 
 import rclpy.logging
-logger = rclpy.logging.get_logger('orchard_slam.launch')
+
+logger = rclpy.logging.get_logger("orchard_slam.launch")
 
 
 def launch_setup(context: LaunchContext, *args, **kwargs):
@@ -29,9 +30,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     # https://docs.ros.org/en/melodic/api/robot_localization/html/navsat_transform_node.html
 
     _launch_slam_toolbox_lifelong = IncludeLaunchDescription(
-        AnyLaunchDescriptionSource(
-            os.path.join(slam_toolbox_pkg_share, "launch", "lifelong_launch.py")
-        ),
+        AnyLaunchDescriptionSource(os.path.join(slam_toolbox_pkg_share, "launch", "lifelong_launch.py")),
         launch_arguments={
             "use_sim_time": use_sim_time,
             # "odom_frame": "amiga__odom"
@@ -39,21 +38,21 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     )
 
     _node_ekf_local = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='ekf_local',
-        output='screen',
+        package="robot_localization",
+        executable="ekf_node",
+        name="ekf_local",
+        output="screen",
         parameters=[
-            os.path.join(orchard_slam_pkg_share, 'config/ekf_local.yaml'),
-            {'use_sim_time': use_sim_time},
+            os.path.join(orchard_slam_pkg_share, "config/ekf_local.yaml"),
+            {"use_sim_time": use_sim_time},
         ],
         remappings=[
-            ('odometry/filtered', 'odometry/filtered/local'),
+            ("odometry/filtered", "odometry/filtered/local"),
         ],
-        arguments=['--ros-args', '--log-level', 'WARN'],
+        arguments=["--ros-args", "--log-level", "WARN"],
     )
 
-    # _node_ekf_global = Node( 
+    # _node_ekf_global = Node(
     #     package='robot_localization',
     #     executable='ekf_node',
     #     name='ekf_global',
@@ -72,14 +71,11 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         executable="navsat_transform_node",
         name="navsat_transform",
         output="log",
-        parameters=[
-            os.path.join(orchard_slam_pkg_share, 'config', 'navsat.yaml'),
-            {'use_sim_time': use_sim_time}
-        ],
+        parameters=[os.path.join(orchard_slam_pkg_share, "config", "navsat.yaml"), {"use_sim_time": use_sim_time}],
         remappings=[
             # ('/imu', '/imu/data'),
             # ('/gps/fix', '/gps/fix'),
-            ('/odometry/filtered', '/odometry/filtered/local'),
+            ("/odometry/filtered", "/odometry/filtered/local"),
         ],
         # arguments=['--ros-args', '--log-level', 'WARN'],
     )
@@ -92,11 +88,27 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     ]
     return _to_run
 
+
 def generate_launch_description():
     declared_configs = [
-        dict(name="load_map", default_value="false", choices=["true", "false"], description="Whether to load a map from disk or not"),
-        dict(name="use_sim_time", default_value="true", choices=["true", "false"], description="Whether to use simulation time (Gazebo) or real time"),
-        dict(name="world", default_value="small_orchard", choices=["small_orchard"], description="The world to load the map for."),
+        dict(
+            name="load_map",
+            default_value="false",
+            choices=["true", "false"],
+            description="Whether to load a map from disk or not",
+        ),
+        dict(
+            name="use_sim_time",
+            default_value="true",
+            choices=["true", "false"],
+            description="Whether to use simulation time (Gazebo) or real time",
+        ),
+        dict(
+            name="world",
+            default_value="small_orchard",
+            choices=["small_orchard"],
+            description="The world to load the map for.",
+        ),
     ]
 
     declared_args = [DeclareLaunchArgument(**config) for config in declared_configs]

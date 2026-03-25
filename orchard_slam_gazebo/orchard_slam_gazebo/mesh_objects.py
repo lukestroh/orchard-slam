@@ -3,6 +3,7 @@ import trimesh
 import numpy as np
 import os
 
+
 class MeshObjects:
     @staticmethod
     def load_mesh(mesh_path: str, mesh_type: str = "ply") -> trimesh.Trimesh:
@@ -26,20 +27,23 @@ class MeshObjects:
     ) -> None:
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
-        
+
         # Ensure vertex normals are computed (required by Gazebo/DART)
-        if not hasattr(mesh, 'vertex_normals') or len(mesh.vertex_normals) != len(mesh.vertices):
+        if not hasattr(mesh, "vertex_normals") or len(mesh.vertex_normals) != len(mesh.vertices):
             mesh.fix_normals()
             _ = mesh.vertex_normals  # Force computation
-        
+
         export_path = os.path.join(dir_path, filename)
         mesh.export(f"{export_path}", file_type="obj", include_normals=True)
         return
-    
+
 
 if __name__ == "__main__":
     import sys
-    print("Converting PLY meshes to OBJ format...\n Are you sure you want to do this? This will overwrite any existing OBJ files in the target directory.")
+
+    print(
+        "Converting PLY meshes to OBJ format...\n Are you sure you want to do this? This will overwrite any existing OBJ files in the target directory."
+    )
     resp = input("(y/n): ")
     if resp.lower() != "y":
         print("Aborting...")
