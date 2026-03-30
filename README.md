@@ -6,13 +6,12 @@ NOTE: Currently only developing for Gazebo.
 
 ## SLAM / sensor integration:
 ```
-     IMU + Odom + GPS pose
+       IMU + Odom
             │
             ▼
         ekf_local
-     (world_frame: odom)
             │
-            ▼ /odometry/filtered + odom->base_link tf
+            ▼ /odometry/filtered + odom->base tf
             │
       slam_toolbox
      (reads /scan + TF)

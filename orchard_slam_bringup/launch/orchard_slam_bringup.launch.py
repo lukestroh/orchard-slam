@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
-from ament_index_python.packages import get_package_share_directory
-from launch import LaunchDescription, LaunchContext
-from launch.actions import (
-    DeclareLaunchArgument,
-    IncludeLaunchDescription,
-    RegisterEventHandler,
-    OpaqueFunction,
-    TimerAction,
-)
-from launch.conditions import UnlessCondition, IfCondition
-from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
-from launch.launch_description_sources import AnyLaunchDescriptionSource
-from launch.substitutions import (
-    LaunchConfiguration,
-    PathJoinSubstitution,
-)
-from launch_ros.actions import Node
 import os
 
 import rclpy.logging
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchContext, LaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+    RegisterEventHandler,
+    TimerAction,
+)
+from launch.conditions import IfCondition, UnlessCondition
+
+# from launch.event_handlers import OnProcessExit, OnProcessIO, OnProcessStart
+from launch.launch_description_sources import AnyLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
 logger = rclpy.logging.get_logger("orchard_slam.launch")
 
@@ -30,6 +28,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
     world_sdf_file = LaunchConfiguration("world_sdf_file")
     robot_x = LaunchConfiguration("robot_x")
     robot_y = LaunchConfiguration("robot_y")
+    use_joystick = LaunchConfiguration("use_joystick")
 
     # Gazebo-specific launch configurations
     gazebo_headless = LaunchConfiguration("gazebo_headless")
@@ -159,6 +158,24 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
 
     _delay_launch_orchard_nav = TimerAction(period=20.0, actions=[_launch_orchard_nav])
 
+    _node_joystick = Node(
+        package="joy",
+        executable="joy_node",
+        name="joy_node",
+        output="screen",
+        condition=IfCondition(use_joystick),
+        parameters=[{"use_sim_time": sim_gazebo}],
+    )
+
+    _node_keyboard_teleop = Node(
+        package="orchard_slam_bringup",
+        executable="keyboard_teleop",
+        name="keyboard_teleop",
+        output="screen",
+        condition=UnlessCondition(use_joystick),
+        parameters=[{"use_sim_time": sim_gazebo}],
+    )
+
     _to_run = [
         _launch_amiga_description,
         _launch_gazebo,
@@ -167,6 +184,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs):
         _node_rviz,
         _node_joint_state_broadcaster_spawner,
         _node_diff_drive_controller_spawner,
+        _node_joystick,
+        _node_keyboard_teleop,
     ]
 
     return _to_run
@@ -185,6 +204,12 @@ def generate_launch_description():
         ),
         dict(name="robot_x", default_value="0.0", description="Initial x position of the robot in Gazebo (meters)"),
         dict(name="robot_y", default_value="0.0", description="Initial y position of the robot in Gazebo (meters)"),
+        dict(
+            name="use_joystick",
+            default_value="false",
+            choices=["true", "false"],
+            description="Joystick control for teleop.",
+        ),
         # Gazebo-specific launch configs
         dict(name="gazebo_headless", default_value="false", choices=["true", "false"]),
         dict(name="sim_gazebo", default_value="true", choices=["true", "false"]),

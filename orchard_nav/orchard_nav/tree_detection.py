@@ -37,7 +37,7 @@ def get_row_goal(
     robot_heading: float,
     goal_distance: float = 4.0,
     expected_row_width: float = 4.0,
-) -> PoseStamped | None:
+) -> tuple[np.ndarray, float]:
     robot_pos = np.array([robot_pose.position.x, robot_pose.position.y])
     """TODO: this needs to handle more edge cases
     - no rows

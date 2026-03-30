@@ -1,27 +1,43 @@
+from threading import Lock
+
+import numpy as np
 import rclpy
-from rclpy.action import ActionServer, GoalResponse, CancelResponse
+from geometry_msgs.msg import Point, PoseStamped, Twist, TwistStamped
+from nav_msgs.msg import OccupancyGrid, Odometry
+from orchard_msgs.action import StartOrchardNavigation
+from orchard_msgs.msg import OrchardNavState as OrchardNavStateMsg
+from orchard_slam_bringup.logger_node import LoggerNode
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.action.server import ServerGoalHandle
-from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
 from rclpy.duration import Duration
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.parameter import Parameter
-from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
-
-from geometry_msgs.msg import Point, PoseStamped, Twist, TwistStamped
-from orchard_msgs.action import StartOrchardNavigation
-from orchard_msgs.msg import OrchardNavState as OrchardNavStateMsg
-from nav_msgs.msg import OccupancyGrid, Odometry
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker, MarkerArray
 
-from orchard_slam_bringup.logger_node import LoggerNode
-from orchard_nav.nav_state import OrchardNavState
 from orchard_nav import orchard_row as ochr
 from orchard_nav import tree_detection as ochtd
+from orchard_nav.nav_state import OrchardNavState
 
-import numpy as np
-from threading import Lock
+"""
+# need to find a way to detect if we've been in all rows.
+# look to see if there was another line of trees that we haven't traversed yet. We can detect
+# rows over that have been seen by the lidar. for realistic lidar, we should probably extend the range.
+# This means we need a dynamically growing history of rows seen
+# Plan:
+# 1. when the end of a row is detected, consult global costmap to map out all orchard rows using same ransac method. store and label rows (create Row message as well, let BT subscribe).
+# 2.  calculate which row we're in based on current robot position. store current row id on blackboard (actually, do this last one when entering a new row.)
+# 3. assess whether the next row has been seen. if so, turn towards it.
+# 4. if starting in the middle of the orchard and both sides are equivalent, randomly pick one.
+# 5. if it's the first or last row in an orchard, we should try to map both sides of the row. This
+# isn't a problem for the local navigation with the local costmap, but we need better logic for
+# turning / detecting "in-row" when on the edge of an orchard.
+# 6. when done, be sure to set mapping_complete on blackboard so robot can go home. we probably also need
+# a termination topic/blackboard var
+"""
 
 
 class OrchardNav(LoggerNode):
@@ -37,13 +53,19 @@ class OrchardNav(LoggerNode):
 
         # QoS profiles
         self._qos_orchard_nav_status = QoSProfile(
-            depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
         self._qos_initial_start_pose = QoSProfile(
-            depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
         self._qos_goal_pose = QoSProfile(
-            depth=10, reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE
+            depth=10,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
         )
 
         # Subscriptions
@@ -89,21 +111,21 @@ class OrchardNav(LoggerNode):
             callback_group=self._cb_group_reentrant,
             qos_profile=10,
         )
-        self._sub_orchard_nav_active_state = self.create_subscription(
-            msg_type=OrchardNavStateMsg,
-            topic="/orchard_nav/active_state",
-            callback=self._sub_cb_orchard_nav_active_state,
-            callback_group=self._cb_group_reentrant,
-            qos_profile=self._qos_orchard_nav_status,
-        )
+        # self._sub_orchard_nav_active_state = self.create_subscription(
+        #     msg_type=OrchardNavStateMsg,
+        #     topic="/orchard_nav/active_state",
+        #     callback=self._sub_cb_orchard_nav_active_state,
+        #     callback_group=self._cb_group_reentrant,
+        #     qos_profile=self._qos_orchard_nav_status,
+        # )
 
         # Publishers
-        self._pub_orchard_nav_next_state = self.create_publisher(
-            msg_type=OrchardNavStateMsg,
-            topic="/orchard_nav/next_state",
-            callback_group=self._cb_group_reentrant,
-            qos_profile=self._qos_orchard_nav_status,
-        )
+        # self._pub_orchard_nav_next_state = self.create_publisher(
+        #     msg_type=OrchardNavStateMsg,
+        #     topic="/orchard_nav/next_state",
+        #     callback_group=self._cb_group_reentrant,
+        #     qos_profile=self._qos_orchard_nav_status,
+        # )
         self._pub_diff_drive_cmd_vel = self.create_publisher(
             msg_type=TwistStamped,
             topic="/diff_drive_controller/cmd_vel",
@@ -174,7 +196,7 @@ class OrchardNav(LoggerNode):
         # State variables
         self.nav_state = OrchardNavState.IDLE
         self.goal_pose = None
-        self.robot_yaw = None
+        self.robot_yaw = 0.0
         self.row_detected = False
         self._gate_nav2_cmd_vel = False
         return
@@ -189,14 +211,13 @@ class OrchardNav(LoggerNode):
         return
 
     def _sub_cb_nav_cmd_vel(self, msg: Twist):
-        if self._gate_nav2_cmd_vel:
-            return
         twist_stamped = TwistStamped()
         twist_stamped.header.stamp = self.get_clock().now().to_msg()
         twist_stamped.twist = Twist()
         twist_stamped.twist.linear.x = msg.linear.x
         twist_stamped.twist.angular.z = msg.angular.z
         self._pub_diff_drive_cmd_vel.publish(twist_stamped)
+        return
 
     def _sub_cb_laser_scan(self, msg: LaserScan):
         """Callback for laser scan data (obstacle detection)"""
@@ -208,12 +229,12 @@ class OrchardNav(LoggerNode):
         with self._lock_local_costmap:
             self._msg_local_costmap = msg
         return
-    
+
     def _sub_cb_map(self, msg: OccupancyGrid):
         """Callback for map data"""
         self._msg_occupancy_grid = msg
         return
-    
+
     def _sub_cb_global_costmap(self, msg: OccupancyGrid):
         """Callback for global costmap data"""
         with self._lock_global_costmap:
@@ -224,12 +245,12 @@ class OrchardNav(LoggerNode):
         """Callback for orchard navigation active state updates"""
         self._msg_orchard_nav_active_state = msg
         return
-    
+
     def _sub_cb_initial_start_pose(self, msg: PoseStamped):
         """Callback for receiving the robot's initial pose at the start of navigation"""
         self._msg_initial_start_pose = msg
         return
-    
+
     def _action_exec_cb_explore(self, goal_handle: ServerGoalHandle):
         """Execute the explore behavior"""
         _result = StartOrchardNavigation.Result()
@@ -252,12 +273,12 @@ class OrchardNav(LoggerNode):
             cmd_vel.twist.angular.z = 0.0
             self._pub_diff_drive_cmd_vel.publish(cmd_vel)
             self.get_clock.sleep_for(rclpy.duration.Duration(seconds=0.1))  # Sleep to prevent busy loop
-        
+
         _result.success = True
         _result.message = "Explore behavior completed successfully."
         goal_handle.succeed()
         return _result
-    
+
     def _action_exec_cb_return_home(self, goal_handle: ServerGoalHandle):
         """Execute the return_home behavior"""
         _result = StartOrchardNavigation.Result()
@@ -267,22 +288,22 @@ class OrchardNav(LoggerNode):
             _result.message = "No initial start pose received, cannot return home!"
             goal_handle.abort()
             return _result
-        
+
         self._pub_goal.publish(self._msg_initial_start_pose)
-        
-        while self._msg_orchard_nav_status.nav_state == OrchardNavState.RETURN_HOME:
+
+        while True:
             if self.check_if_goal_reached():
                 self.info("Successfully returned home! Succeeding return_home goal.")
                 break
             # Publish the initial start pose as the goal for the robot to navigate to
             self._pub_goal.publish(self._msg_initial_start_pose)
-            self.get_clock().sleep_for(rclpy.duration.Duration(seconds=0.1))  # Sleep to prevent busy loop
-        
+            self.get_clock().sleep_for(rclpy.duration.Duration(seconds=0.1))
+
         _result.success = True
         _result.message = "Return home behavior completed successfully (not actually implemented)."
         goal_handle.succeed()
         return _result
-    
+
     def _action_exec_cb_turn_row(self, goal_handle: ServerGoalHandle):
         """Execute the turn_row behavior — currently stops the robot for debugging."""
         _result = StartOrchardNavigation.Result()
@@ -301,68 +322,27 @@ class OrchardNav(LoggerNode):
         goal_handle.succeed(_result)
         return _result
 
-    def is_in_row(self, costmap: OccupancyGrid, obstacle_threshold: int = 65) -> bool:
-        """Returns True if there are obstacles in the forward-facing third of the local costmap."""
-        if costmap is None or self.robot_yaw is None:
-            return True
-
-        data = np.array(costmap.data, dtype=np.int16).reshape(
-            (costmap.info.height, costmap.info.width)
-        )
-        h, w = data.shape
-
-        # Select the front third of the grid in the robot's forward direction
-        if abs(np.cos(self.robot_yaw)) > abs(np.sin(self.robot_yaw)):  # mostly facing ±x
-            front = data[:, 2*w // 3:] if np.cos(self.robot_yaw) > 0 else data[:, :w // 3]
-        else:                                                            # mostly facing ±y
-            front = data[2*h // 3:, :] if np.sin(self.robot_yaw) > 0 else data[:h // 3, :]
-
-        return bool(np.any(front >= obstacle_threshold))
-
-
     def _action_exec_cb_traverse_row(self, goal_handle: ServerGoalHandle):
         """Get the goal"""
         self.goal_handle = goal_handle
         _result = StartOrchardNavigation.Result()
 
-        while self._msg_orchard_nav_active_state.nav_state == OrchardNavState.TRAVERSE_ROW.value:
+        while True:
             with self._lock_local_costmap:
                 local_costmap = self._msg_local_costmap
-            with self._lock_global_costmap:
-                global_costmap = self._msg_global_costmap
+            assert local_costmap is not None
 
-            if not self.is_in_row(local_costmap):
+            if not self.is_in_row(local_costmap):  # type: ignore[union-attr]
                 self.info("END OF ROW detected — transitioning to TURN_ROW.")
-                self._gate_nav2_cmd_vel = True  # block Nav2 immediately, before BT transitions
-                self._pub_orchard_nav_next_state.publish(
-                    OrchardNavStateMsg(nav_state=OrchardNavState.TURN_ROW.value)
-                )
                 break
-            ...
-            # need to find a way to detect if we've been in all rows. 
-            # look to see if there was another line of trees that we haven't traversed yet. We can detect
-            # rows over that have been seen by the lidar. for realistic lidar, we should probably extend the range.
-            # This means we need a dynamically growing history of rows seen
-            # Plan:
-            # 1. when the end of a row is detected, consult global costmap to map out all orchard rows using same ransac method. store and label rows (create Row message as well, let BT subscribe).
-            # 2.  calculate which row we're in based on current robot position. store current row id on blackboard (actually, do this last one when entering a new row.)
-            # 3. assess whether the next row has been seen. if so, turn towards it.
-            # 4. if starting in the middle of the orchard and both sides are equivalent, randomly pick one.
-            # 5. if it's the first or last row in an orchard, we should try to map both sides of the row. This
-            # isn't a problem for the local navigation with the local costmap, but we need better logic for 
-            # turning / detecting "in-row" when on the edge of an orchard.
-            # 6. when done, be sure to set mapping_complete on blackboard so robot can go home. we probably also need
-            # a termination topic/blackboard var
 
-            
-        
             obstacle_positions = self.get_obstacle_positions(costmap=local_costmap)
             rows = ochr.detect_orchard_rows(
                 obstacle_positions=obstacle_positions,
                 inlier_threshold=0.2,  # m distance threshold for inliers
-                min_inliers=10,       # minimum 10 inliers to consider a valid row
-                max_iterations=100,   # RANSAC iterations
-                min_row_separation=1.5  # meter distance between rows
+                min_inliers=10,  # minimum 10 inliers to consider a valid row
+                max_iterations=100,  # RANSAC iterations
+                min_row_separation=1.5,  # meter distance between rows
             )
             if not rows:
                 continue
@@ -383,29 +363,29 @@ class OrchardNav(LoggerNode):
             goal_msg.pose.orientation.w = qw
             self._pub_goal_pose.publish(goal_msg)
 
-            self.get_clock().sleep_for(rclpy.duration.Duration(seconds=0.1))
-
-
-
-        # if turn, publish next state as turn. else, go home
+            self.get_clock().sleep_for(Duration(seconds=0.1))  # type: ignore[assignment]
 
         _result.success = True
-        _result.message = ""
-        goal_handle.succeed(_result)
+        _result.message = "End of row detected"
+        _result.next_state = OrchardNavState.TURN_ROW.value
+        goal_handle.succeed()
         return
 
-    def new_goal(self, x, y):
-        """Publish a new goal pose for the robot to navigate to"""
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = "map"
-        goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.pose.position.x = x
-        goal_pose.pose.position.y = y
-        goal_pose.pose.orientation.w = 1.0  # Facing forward
+    def is_in_row(self, costmap: OccupancyGrid, obstacle_threshold: int = 65) -> bool:
+        """Returns True if there are obstacles in the forward-facing third of the local costmap."""
+        if costmap is None or self.robot_yaw is None:
+            return True
 
-        self._pub_goal.publish(goal_pose)
-        self.goal_pose = goal_pose
-        return
+        data = np.array(costmap.data, dtype=np.int16).reshape((costmap.info.height, costmap.info.width))
+        h, w = data.shape
+
+        # Select the front third of the grid in the robot's forward direction
+        if abs(np.cos(self.robot_yaw)) > abs(np.sin(self.robot_yaw)):  # mostly facing ±x
+            front = data[:, 2 * w // 3 :] if np.cos(self.robot_yaw) > 0 else data[:, : w // 3]
+        else:  # mostly facing ±y
+            front = data[2 * h // 3 :, :] if np.sin(self.robot_yaw) > 0 else data[: h // 3, :]
+
+        return bool(np.any(front >= obstacle_threshold))
 
     def check_if_goal_reached(self):
         """Check if the robot has reached its current goal"""
@@ -472,15 +452,6 @@ class OrchardNav(LoggerNode):
         neighbors.append(idx - width)
         return neighbors
 
-    def in_row(self, map_data):
-        if map_data is None:
-            return False
-        return any(cell > 50 for cell in map_data)
-
-    def choose_goal(self):
-        """Logic to choose a new goal based on sensor data and map"""
-        return
-
     def publish_row_markers(
         self,
         rows: list,
@@ -501,20 +472,19 @@ class OrchardNav(LoggerNode):
         """
         marker_array = MarkerArray()
         stamp = self.get_clock().now().to_msg()
-        lifetime = Duration(seconds=1.0).to_msg()
-
+        lifetime = Duration(seconds=1.0).to_msg()  # type: ignore[assignment]
 
         # Delete all previous markers in the namespace before redrawing
         delete_all = Marker()
         delete_all.action = Marker.DELETEALL
-        marker_array.markers.append(delete_all)
+        marker_array.markers.append(delete_all)  # type: ignore[union-attr]
 
         for row_idx, row in enumerate(rows):
             color = self._residual_color(row.residual, max_residual)
             base_id = row_idx * 3  # 3 markers per row: 0=line, 1=arrow, 2=cylinder
 
-            p = row.point        # (2,) centroid
-            d = row.direction    # (2,) unit vector
+            p = row.point  # (2,) centroid
+            d = row.direction  # (2,) unit vector
 
             # --- LINE STRIP: fitted row axis ---
             line_marker = Marker()
@@ -528,56 +498,22 @@ class OrchardNav(LoggerNode):
             line_marker.scale.x = 0.05  # line width (metres)
             line_marker.color = color
 
-            start = Point(x=float(p[0] - d[0] * line_half_length),
-                        y=float(p[1] - d[1] * line_half_length), z=0.0)
-            end   = Point(x=float(p[0] + d[0] * line_half_length),
-                        y=float(p[1] + d[1] * line_half_length), z=0.0)
+            start = Point(
+                x=float(p[0] - d[0] * line_half_length),
+                y=float(p[1] - d[1] * line_half_length),
+                z=0.0,
+            )
+            end = Point(
+                x=float(p[0] + d[0] * line_half_length),
+                y=float(p[1] + d[1] * line_half_length),
+                z=0.0,
+            )
             line_marker.points = [start, end]
-            marker_array.markers.append(line_marker)
-
-            # # --- ARROW: direction indicator at centroid ---
-            # arrow_marker = Marker()
-            # arrow_marker.header.frame_id = "map"
-            # arrow_marker.header.stamp = stamp
-            # arrow_marker.ns = "orchard_rows"
-            # arrow_marker.id = base_id + 1
-            # arrow_marker.type = Marker.ARROW
-            # arrow_marker.action = Marker.ADD
-            # arrow_marker.lifetime = lifetime
-            # arrow_marker.scale.x = 0.6   # shaft length
-            # arrow_marker.scale.y = 0.1   # shaft diameter
-            # arrow_marker.scale.z = 0.15  # head diameter
-            # arrow_marker.color = color
-
-            # arrow_tail = Point(x=float(p[0]), y=float(p[1]), z=0.05)
-            # arrow_head = Point(x=float(p[0] + d[0] * 0.6),
-            #                 y=float(p[1] + d[1] * 0.6), z=0.05)
-            # arrow_marker.points = [arrow_tail, arrow_head]
-            # marker_array.markers.append(arrow_marker)
-
-            # # --- CYLINDER: residual indicator at centroid ---
-            # cyl_marker = Marker()
-            # cyl_marker.header.frame_id = "map"
-            # cyl_marker.header.stamp = stamp
-            # cyl_marker.ns = "orchard_rows"
-            # cyl_marker.id = base_id + 2
-            # cyl_marker.type = Marker.CYLINDER
-            # cyl_marker.action = Marker.ADD
-            # cyl_marker.lifetime = lifetime
-            # diameter = float(np.clip(row.residual * 4.0, 0.05, 1.0))  # scale for visibility
-            # cyl_marker.scale.x = diameter
-            # cyl_marker.scale.y = diameter
-            # cyl_marker.scale.z = 0.1    # flat disc
-            # cyl_marker.pose.position.x = float(p[0])
-            # cyl_marker.pose.position.y = float(p[1])
-            # cyl_marker.pose.position.z = 0.0
-            # cyl_marker.pose.orientation.w = 1.0
-            # cyl_marker.color = color
-            # marker_array.markers.append(cyl_marker)
+            marker_array.markers.append(line_marker)  # type: ignore[union-attr]
 
         self._pub_detected_row_markers.publish(marker_array)
         return
-    
+
     def _residual_color(self, residual: float, max_residual: float = 0.5) -> ColorRGBA:
         """
         Map residual to a green -> yellow -> red color scale.
@@ -602,33 +538,39 @@ class OrchardNav(LoggerNode):
         c.b = 0.0
         return c
 
-
     def _action_goal_cb_explore(self, goal_handle):
         self.get_logger().info("Received explore goal request")
         return GoalResponse.ACCEPT
-    
-    
+
     def _action_goal_cb_turn_row(self, goal_handle):
         self.get_logger().info("Received turn_row goal request")
         return GoalResponse.ACCEPT
+
     def _action_cancel_cb_return_home(self, goal_handle):
         self.get_logger().info("Received return_home goal cancel request")
         return CancelResponse.ACCEPT
+
     def _action_cancel_cb_explore(self, goal_handle):
         self.get_logger().info("Received explore goal cancel request")
         return CancelResponse.ACCEPT
+
     def _action_cancel_cb_turn_row(self, goal_handle):
         self.get_logger().info("Received turn_row goal cancel request")
         return CancelResponse.ACCEPT
+
     def _action_goal_cb_return_home(self, goal_handle):
         self.get_logger().info("Received return_home goal request")
         return GoalResponse.ACCEPT
+
     def _action_goal_cb_traverse_row(self, goal_handle):
         self.get_logger().info("Received navigation goal request")
         return GoalResponse.ACCEPT
+
     def _action_cancel_cb_traverse_row(self, goal_handle):
         self.get_logger().info("Received navigation goal cancel request")
         return CancelResponse.ACCEPT
+
+
 def main(args=None):
     rclpy.init(args=args)
     node = OrchardNav()

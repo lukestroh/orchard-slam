@@ -28,6 +28,8 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": [],
+        "console_scripts": [
+            "keyboard_teleop = orchard_slam_bringup.keyboard_teleop:main",
+        ],
     },
 )
